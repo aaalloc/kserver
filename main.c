@@ -40,12 +40,12 @@ static void client_work(struct work_struct *work) {}
 static int __init custom_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
-    wq_clients = create_workqueue("wq_clients");
-    if (!wq_clients)
-    {
-        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
-        return -ENOMEM;
-    }
+    // wq_clients = create_workqueue("wq_clients");
+    // if (!wq_clients)
+    // {
+    //     pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+    //     return -ENOMEM;
+    // }
 
     int res = open_lsocket(&listen_sock, 12345);
     if (res < 0)
@@ -87,6 +87,7 @@ static void __exit custom_exit(void)
 {
     //
     pr_info("%s: Server stopped.\n", THIS_MODULE->name);
+    close_lsocket(listen_sock);
 }
 
 module_init(custom_init);

@@ -74,3 +74,12 @@ err_setsockopt:
     sock_release(sock);
     return error;
 }
+
+void close_lsocket(struct socket *sock)
+{
+    if (sock)
+    {
+        kernel_sock_shutdown(sock, SHUT_RDWR);
+        sock_release(sock);
+    }
+}
