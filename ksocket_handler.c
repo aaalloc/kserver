@@ -32,19 +32,19 @@ int open_lsocket(struct socket **result, int port)
         return error;
     }
 
-    // error = sock->ops->setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, kopt, sizeof(opt));
-    // if (error < 0)
-    // {
-    //     pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
-    //     goto err_setsockopt;
-    // }
+    error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
 
-    // error = sock->ops->setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
-    // if (error < 0)
-    // {
-    //     pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
-    //     goto err_setsockopt;
-    // }
+    error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
