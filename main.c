@@ -75,8 +75,8 @@ clean:
 }
 
 /*
- * This function creates a client structure, happend
- * it to clients list and return it work_struct
+ * This function creates a client structure, appends
+ * it to clients list and return a work_struct
  */
 static struct work_struct *create_client(struct socket *sock)
 {
@@ -111,15 +111,17 @@ static int kserver_daemon(void *data)
             pr_err("%s: kernel_accept failed: %d\n", THIS_MODULE->name, error);
             continue;
         }
-        if ((work = create_client(sock)) == NULL)
+
+        work = create_client(sock);
+        if (!work)
         {
             pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
             kernel_sock_shutdown(sock, SHUT_RDWR);
             sock_release(sock);
             continue;
         }
-        pr_info("%s: kernel_accept succeeded\n", THIS_MODULE->name);
 
+        pr_info("%s: kernel_accept succeeded\n", THIS_MODULE->name);
         queue_work(kserver_wq_clients, work);
     }
 
