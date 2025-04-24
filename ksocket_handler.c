@@ -12,6 +12,7 @@
 #include "ksocket_handler.h"
 #include <linux/errno.h>
 #include <linux/in.h>
+#include <linux/inet.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
@@ -49,6 +50,7 @@ int open_lsocket(struct socket **result, int port)
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
+    // TODO: use in4_pton with a addr_str
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     error = kernel_bind(sock, (struct sockaddr *)&addr, sizeof(addr));
