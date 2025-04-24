@@ -1,8 +1,16 @@
-ifneq ($(KERNELRELEASE),)
-	obj-m := main.o
-else
-	KDIR ?= /lib/modules/$(shell uname -r)/build
-	PWD := $(shell pwd)
+KDIR ?= /lib/modules/$(shell uname -r)/build
+PWD := $(shell pwd)
+
+ccflags-y += -Wall -g
+
+TARGET = kserver
+
+kserver-y := main.o
+kserver-y += ksocket_handler.o
+
+obj-m := kserver.o
+
+all: default
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
@@ -12,5 +20,3 @@ bear:
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-
-endif
