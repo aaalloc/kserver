@@ -23,7 +23,9 @@ MODULE_DESCRIPTION("My kernel module");
 MODULE_AUTHOR("yanovskyy");
 MODULE_LICENSE("GPL");
 
-static struct workqueue_struct *wq_clients;
+#define BUF_SIZE 4096
+
+static struct workqueue_struct *kserver_wq_clients;
 static struct task_struct *kserver_thread;
 typedef struct _client
 {
@@ -41,8 +43,35 @@ static void client_work(struct work_struct *work)
     client *cl = container_of(work, client, client_context);
 
     pr_info("%s: client_work AAA started\n", THIS_MODULE->name);
+    unsigned char *buf;
+    buf = kzalloc(BUF_SIZE, GFP_KERNEL);
 
+    if (!buf)
+    {
+        pr_err("%s: Failed to allocate memory for buffer\n", THIS_MODULE->name);
+        goto clean;
+    }
+
+    for (;;)
+    {
+        int ret = ksocket_read(cl->sock, buf, BUF_SIZE);
+        if (ret < 0)
+        {
+            pr_err("%s: ksocket_read failed: %d\n", THIS_MODULE->name, ret);
+            goto clean;
+        }
+        if (ret == 0)
+        {
+            pr_info("%s: Connection closed by peer\n", THIS_MODULE->name);
+            goto clean;
+        }
+
+        pr_info("%s: Received message: %s\n", THIS_MODULE->name, buf);
+    }
+
+clean:
     kernel_sock_shutdown(cl->sock, SHUT_RDWR);
+    kfree(buf);
 }
 
 /*
@@ -91,7 +120,7 @@ static int kserver_daemon(void *data)
         }
         pr_info("%s: kernel_accept succeeded\n", THIS_MODULE->name);
 
-        queue_work(wq_clients, work);
+        queue_work(kserver_wq_clients, work);
     }
 
     pr_info("%s: kserver_daemon stopped\n", THIS_MODULE->name);
@@ -121,8 +150,8 @@ static int __init kserver_init(void)
     // Note for the future: have a check on flags, espcially
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
-    wq_clients = create_workqueue("wq_clients");
-    if (!wq_clients)
+    kserver_wq_clients = create_workqueue("wq_clients");
+    if (!kserver_wq_clients)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
@@ -139,31 +168,6 @@ static int __init kserver_init(void)
         return PTR_ERR(kserver_thread);
     }
 
-    // for (int i;; i++)
-    // {
-    //     int res = kernel_accept(NULL, NULL, 0);
-
-    //     client *cl = kmalloc(sizeof(client), GFP_KERNEL);
-    //     if (!cl)
-    //     {
-    //         pr_err("%s: Failed to allocate memory for client\n", THIS_MODULE->name);
-    //         return -ENOMEM;
-    //     }
-    //     cl->sock = NULL;                      // Initialize the socket to NULL
-    //     INIT_WORK(&cl->client_context, NULL); // Initialize the work structure
-    //     list_add_tail(&cl->list, &clients);   // Add to the list of clients
-    //     // Add the work to the workqueue
-    //     if (queue_work(wq_clients, &cl->client_context))
-    //     {
-    //         pr_info("%s: Work queued successfully\n", THIS_MODULE->name);
-    //     }
-    //     else
-    //     {
-    //         pr_err("%s: Failed to queue work\n", THIS_MODULE->name);
-    //         kfree(cl);
-    //         return -ENOMEM;
-    //     }
-    // }
     return 0;
 }
 
@@ -176,8 +180,8 @@ static void __exit kserver_exit(void)
 
     close_lsocket(listen_sock);
 
-    if (wq_clients)
-        destroy_workqueue(wq_clients);
+    if (kserver_wq_clients)
+        destroy_workqueue(kserver_wq_clients);
 
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }

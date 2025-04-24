@@ -17,6 +17,27 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 
+int ksocket_read(struct socket *sock, char *buf, int len)
+{
+    struct msghdr msg;
+    struct kvec vec;
+    int ret;
+
+    memset(&msg, 0, sizeof(msg));
+    memset(buf, 0, len);
+
+    vec.iov_base = buf;
+    vec.iov_len = len;
+
+    ret = kernel_recvmsg(sock, &msg, &vec, 1, len, msg.msg_flags);
+    if (ret < 0)
+    {
+        pr_err("%s: kernel_recvmsg failed: %d\n", THIS_MODULE->name, ret);
+        return ret;
+    }
+    return ret;
+}
+
 int open_lsocket(struct socket **result, int port)
 {
     struct socket *sock;
