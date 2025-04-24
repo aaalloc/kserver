@@ -1,1 +1,0 @@
-savedcmd_Module.symvers :=  /home/yanovskyy/Documents/linux-6.14.3/scripts/mod/modpost -M -m -b  -a      -o Module.symvers -T modules.order -i /home/yanovskyy/Documents/linux-6.14.3/Module.symvers -e 
