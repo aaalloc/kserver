@@ -67,17 +67,18 @@ static inline client_work *create_client_work(unsigned char *packet, int packet_
     return cw;
 }
 
+__attribute__((optimize("O0"))) static void infite_loop(void)
+{
+    for (;;)
+        continue;
+}
+
 static void client_worker(struct work_struct *work)
 {
     client_work *cw = container_of(work, client_work, work);
+    pr_info("%s: Client work done\n", THIS_MODULE->name);
     // pr_info("%s: Packet : %s\n", THIS_MODULE->name, cw->packet);
 }
-
-// __attribute__((optimize("O0"))) static void infite_loop(void)
-// {
-//     for (;;)
-//         continue;
-// }
 
 static void client_handler(struct work_struct *work)
 {
@@ -91,6 +92,9 @@ static void client_handler(struct work_struct *work)
         goto clean;
     }
 
+    // TODO: this is in a case where workqueue should be created with flag
+    // WQ_UNBOUND, one workaround is put back self to the workqueue
+    // after ksocket_read has been done
     for (;;)
     {
         int ret = ksocket_read(cl->sock, buf, BUF_SIZE);
@@ -170,7 +174,6 @@ static int kserver_daemon(void *data)
             continue;
         }
 
-        pr_info("%s: kernel_accept succeeded\n", THIS_MODULE->name);
         queue_work(kserver_wq_clients_read, client_read_work);
     }
 
@@ -198,7 +201,7 @@ static int __init kserver_init(void)
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
-    kserver_wq_clients_work = create_workqueue("wq_clients_work");
+    kserver_wq_clients_work = alloc_workqueue("wq_clients_work", WQ_UNBOUND, 0);
     if (!kserver_wq_clients_work)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
