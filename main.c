@@ -34,18 +34,55 @@ typedef struct _client
     struct work_struct client_context; // representing the client context
 } client;
 
+typedef struct _client_work
+{
+    struct workqueue_struct *wq; // Workqueue for the client
+    struct work_struct work;
+    unsigned char *packet;
+    int packet_len;
+    struct list_head list;
+} client_work;
+
 struct socket *listen_sock;
 
 LIST_HEAD(clients);
+LIST_HEAD(clients_work);
 
-static void client_work(struct work_struct *work)
+static inline client_work *create_client_work(unsigned char *packet, int packet_len)
+{
+    client_work *cw = kmalloc(sizeof(client_work), GFP_KERNEL);
+    if (!cw)
+        return NULL;
+
+    cw->packet = kzalloc(packet_len, GFP_KERNEL);
+    if (!cw->packet)
+    {
+        kfree(cw);
+        return NULL;
+    }
+    memcpy(cw->packet, packet, packet_len);
+    cw->packet_len = packet_len;
+
+    return cw;
+}
+
+static void client_worker(struct work_struct *work)
+{
+    //
+    client_work *cw = container_of(work, client_work, work);
+
+    for (int i = 0; i < cw->packet_len; i++)
+    {
+        pr_info("%s: Packet : %c\n", THIS_MODULE->name, cw->packet[i]);
+    }
+}
+
+static void client_handler(struct work_struct *work)
 {
     client *cl = container_of(work, client, client_context);
 
-    pr_info("%s: client_work AAA started\n", THIS_MODULE->name);
     unsigned char *buf;
-    buf = kzalloc(BUF_SIZE, GFP_KERNEL);
-
+    buf = kmalloc(BUF_SIZE, GFP_KERNEL);
     if (!buf)
     {
         pr_err("%s: Failed to allocate memory for buffer\n", THIS_MODULE->name);
@@ -66,10 +103,35 @@ static void client_work(struct work_struct *work)
             goto clean;
         }
 
-        pr_info("%s: Received message: %s\n", THIS_MODULE->name, buf);
+        client_work *cw = create_client_work(buf, ret);
+        if (!cw)
+        {
+            pr_err("%s: Failed to allocate memory for client work\n", THIS_MODULE->name);
+            goto clean;
+        }
+
+        cw->wq = create_workqueue("wq_client");
+        if (!cw->wq)
+        {
+            pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+            kfree(cw);
+            goto clean;
+        }
+        list_add_tail(&cw->list, &clients_work);
+        INIT_WORK(&cw->work, client_worker);
+        queue_work(cw->wq, &cw->work);
     }
 
 clean:
+    client_work *cw, *tmp;
+    list_for_each_entry_safe(cw, tmp, &clients_work, list)
+    {
+        list_del(&cw->list);
+        if (cw->packet)
+            kfree(cw->packet);
+        flush_workqueue(cw->wq);
+        destroy_workqueue(cw->wq);
+    }
     kernel_sock_shutdown(cl->sock, SHUT_RDWR);
     kfree(buf);
 }
@@ -78,7 +140,7 @@ clean:
  * This function creates a client structure, appends
  * it to clients list and return a work_struct
  */
-static struct work_struct *create_client(struct socket *sock)
+static inline struct work_struct *create_client(struct socket *sock)
 {
     client *cl = kmalloc(sizeof(client), GFP_KERNEL);
     if (!cl)
@@ -88,7 +150,7 @@ static struct work_struct *create_client(struct socket *sock)
     }
 
     cl->sock = sock;
-    INIT_WORK(&cl->client_context, client_work);
+    INIT_WORK(&cl->client_context, client_handler);
     list_add_tail(&cl->list, &clients);
 
     return &cl->client_context;
@@ -183,7 +245,10 @@ static void __exit kserver_exit(void)
     close_lsocket(listen_sock);
 
     if (kserver_wq_clients)
+    {
+        flush_workqueue(kserver_wq_clients);
         destroy_workqueue(kserver_wq_clients);
+    }
 
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
