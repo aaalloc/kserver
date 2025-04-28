@@ -17,14 +17,14 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 
-int ksocket_read(struct socket *sock, char *buf, int len)
+int ksocket_read(struct socket *sock, unsigned char *buf, int len)
 {
-    struct msghdr msg;
+    struct msghdr msg = {0};
     struct kvec vec;
     int ret;
 
-    memset(&msg, 0, sizeof(msg));
-    memset(buf, 0, len);
+    // don't know if its worth it do that, user has just to use wisely the len
+    // memset(buf, 0, len);
 
     vec.iov_base = buf;
     vec.iov_len = len;

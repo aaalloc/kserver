@@ -27,6 +27,7 @@ MODULE_LICENSE("GPL");
 
 static struct workqueue_struct *kserver_wq_clients_read;
 static struct workqueue_struct *kserver_wq_clients_work;
+static struct workqueue_struct *kserver_wq_clients_work_tasks;
 
 static struct task_struct *kserver_thread;
 typedef struct _client
@@ -208,6 +209,14 @@ static int __init kserver_init(void)
         destroy_workqueue(kserver_wq_clients_read);
         return -ENOMEM;
     }
+    kserver_wq_clients_work_tasks = create_workqueue("wq_clients_work_tasks");
+    if (!kserver_wq_clients_work_tasks)
+    {
+        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        destroy_workqueue(kserver_wq_clients_read);
+        destroy_workqueue(kserver_wq_clients_work);
+        return -ENOMEM;
+    }
 
     kserver_thread = kthread_run(kserver_daemon, NULL, THIS_MODULE->name);
     if (IS_ERR(kserver_thread))
@@ -265,6 +274,12 @@ static void __exit kserver_exit(void)
     {
         flush_workqueue(kserver_wq_clients_work);
         destroy_workqueue(kserver_wq_clients_work);
+    }
+
+    if (kserver_wq_clients_work_tasks)
+    {
+        flush_workqueue(kserver_wq_clients_work_tasks);
+        destroy_workqueue(kserver_wq_clients_work_tasks);
     }
 
     free_client_list();
