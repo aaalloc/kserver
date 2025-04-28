@@ -38,8 +38,8 @@ typedef struct _client_work
 {
     struct workqueue_struct *wq; // Workqueue for the client
     struct work_struct work;
-    unsigned char *packet;
-    int packet_len;
+    // unsigned char *packet;
+    // int packet_len;
     struct list_head list;
 } client_work;
 
@@ -54,27 +54,22 @@ static inline client_work *create_client_work(unsigned char *packet, int packet_
     if (!cw)
         return NULL;
 
-    cw->packet = kzalloc(packet_len, GFP_KERNEL);
-    if (!cw->packet)
-    {
-        kfree(cw);
-        return NULL;
-    }
-    memcpy(cw->packet, packet, packet_len);
-    cw->packet_len = packet_len;
+    // cw->packet = kzalloc(packet_len, GFP_KERNEL);
+    // if (!cw->packet)
+    // {
+    //     kfree(cw);
+    //     return NULL;
+    // }
+    // memcpy(cw->packet, packet, packet_len);
+    // cw->packet_len = packet_len;
 
     return cw;
 }
 
 static void client_worker(struct work_struct *work)
 {
-    //
     client_work *cw = container_of(work, client_work, work);
-
-    for (int i = 0; i < cw->packet_len; i++)
-    {
-        pr_info("%s: Packet : %c\n", THIS_MODULE->name, cw->packet[i]);
-    }
+    // pr_info("%s: Packet : %s\n", THIS_MODULE->name, cw->packet);
 }
 
 static void client_handler(struct work_struct *work)
@@ -120,6 +115,7 @@ static void client_handler(struct work_struct *work)
         list_add_tail(&cw->list, &clients_work);
         INIT_WORK(&cw->work, client_worker);
         queue_work(cw->wq, &cw->work);
+        pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
 clean:
@@ -127,8 +123,8 @@ clean:
     list_for_each_entry_safe(cw, tmp, &clients_work, list)
     {
         list_del(&cw->list);
-        if (cw->packet)
-            kfree(cw->packet);
+        // if (cw->packet)
+        //     kfree(cw->packet);
         flush_workqueue(cw->wq);
         destroy_workqueue(cw->wq);
     }
