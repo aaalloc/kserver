@@ -43,8 +43,10 @@ int open_lsocket(struct socket **result, int port)
     int opt = 1;
     sockptr_t kopt = {.kernel = (char *)&opt, .is_kernel = 1};
 
+    struct net *net = current->nsproxy->net_ns;
+
     // IPv4, TCP
-    error = sock_create(AF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
+    error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
     if (error < 0)
     {
         pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);

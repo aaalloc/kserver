@@ -25,7 +25,9 @@ MODULE_LICENSE("GPL");
 
 #define BUF_SIZE 4096
 
-static struct workqueue_struct *kserver_wq_clients;
+static struct workqueue_struct *kserver_wq_clients_read;
+static struct workqueue_struct *kserver_wq_clients_work;
+
 static struct task_struct *kserver_thread;
 typedef struct _client
 {
@@ -36,7 +38,6 @@ typedef struct _client
 
 typedef struct _client_work
 {
-    struct workqueue_struct *wq; // Workqueue for the client
     struct work_struct work;
     // unsigned char *packet;
     // int packet_len;
@@ -72,6 +73,12 @@ static void client_worker(struct work_struct *work)
     // pr_info("%s: Packet : %s\n", THIS_MODULE->name, cw->packet);
 }
 
+// __attribute__((optimize("O0"))) static void infite_loop(void)
+// {
+//     for (;;)
+//         continue;
+// }
+
 static void client_handler(struct work_struct *work)
 {
     client *cl = container_of(work, client, client_context);
@@ -105,29 +112,13 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        cw->wq = create_workqueue("wq_client");
-        if (!cw->wq)
-        {
-            pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
-            kfree(cw);
-            goto clean;
-        }
         list_add_tail(&cw->list, &clients_work);
         INIT_WORK(&cw->work, client_worker);
-        queue_work(cw->wq, &cw->work);
+        queue_work(kserver_wq_clients_work, &cw->work);
         pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
 clean:
-    client_work *cw, *tmp;
-    list_for_each_entry_safe(cw, tmp, &clients_work, list)
-    {
-        list_del(&cw->list);
-        // if (cw->packet)
-        //     kfree(cw->packet);
-        flush_workqueue(cw->wq);
-        destroy_workqueue(cw->wq);
-    }
     kernel_sock_shutdown(cl->sock, SHUT_RDWR);
     kfree(buf);
 }
@@ -156,7 +147,7 @@ static int kserver_daemon(void *data)
 {
     (void)data;
     struct socket *sock;
-    struct work_struct *work;
+    struct work_struct *client_read_work;
 
     allow_signal(SIGKILL);
     allow_signal(SIGTERM);
@@ -170,8 +161,8 @@ static int kserver_daemon(void *data)
             continue;
         }
 
-        work = create_client(sock);
-        if (!work)
+        client_read_work = create_client(sock);
+        if (!client_read_work)
         {
             pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
             kernel_sock_shutdown(sock, SHUT_RDWR);
@@ -180,19 +171,10 @@ static int kserver_daemon(void *data)
         }
 
         pr_info("%s: kernel_accept succeeded\n", THIS_MODULE->name);
-        queue_work(kserver_wq_clients, work);
+        queue_work(kserver_wq_clients_read, client_read_work);
     }
 
     pr_info("%s: kserver_daemon stopped\n", THIS_MODULE->name);
-
-    client *cl, *tmp;
-    list_for_each_entry_safe(cl, tmp, &clients, list)
-    {
-        list_del(&cl->list);
-        kernel_sock_shutdown(cl->sock, SHUT_RDWR);
-        sock_release(cl->sock);
-        kfree(cl);
-    }
     return 0;
 }
 
@@ -210,10 +192,17 @@ static int __init kserver_init(void)
     // Note for the future: have a check on flags, espcially
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
-    kserver_wq_clients = create_workqueue("wq_clients");
-    if (!kserver_wq_clients)
+    kserver_wq_clients_read = create_workqueue("wq_clients");
+    if (!kserver_wq_clients_read)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        return -ENOMEM;
+    }
+    kserver_wq_clients_work = create_workqueue("wq_clients_work");
+    if (!kserver_wq_clients_work)
+    {
+        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        destroy_workqueue(kserver_wq_clients_read);
         return -ENOMEM;
     }
 
@@ -231,6 +220,29 @@ static int __init kserver_init(void)
     return 0;
 }
 
+static void free_client_list(void)
+{
+    client *cl, *tmp;
+    list_for_each_entry_safe(cl, tmp, &clients, list)
+    {
+        list_del(&cl->list);
+        kernel_sock_shutdown(cl->sock, SHUT_RDWR);
+        sock_release(cl->sock);
+        kfree(cl);
+    }
+}
+
+static void free_client_work_list(void)
+{
+    client_work *cw, *tmp;
+    list_for_each_entry_safe(cw, tmp, &clients_work, list)
+    {
+        list_del(&cw->list);
+        // kfree(cw->packet);
+        kfree(cw);
+    }
+}
+
 static void __exit kserver_exit(void)
 {
     pr_info("%s: Server stopped.\n", THIS_MODULE->name);
@@ -240,12 +252,20 @@ static void __exit kserver_exit(void)
 
     close_lsocket(listen_sock);
 
-    if (kserver_wq_clients)
+    if (kserver_wq_clients_read)
     {
-        flush_workqueue(kserver_wq_clients);
-        destroy_workqueue(kserver_wq_clients);
+        flush_workqueue(kserver_wq_clients_read);
+        destroy_workqueue(kserver_wq_clients_read);
     }
 
+    if (kserver_wq_clients_work)
+    {
+        flush_workqueue(kserver_wq_clients_work);
+        destroy_workqueue(kserver_wq_clients_work);
+    }
+
+    free_client_list();
+    free_client_work_list();
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
 
