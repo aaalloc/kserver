@@ -7,6 +7,7 @@ TARGET = kserver
 
 kserver-y := main.o
 kserver-y += ksocket_handler.o
+kserver-y += operations.o
 
 obj-m := kserver.o
 

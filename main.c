@@ -18,6 +18,7 @@
 #include <linux/version.h>
 
 #include "ksocket_handler.h"
+#include "operations.h"
 
 MODULE_DESCRIPTION("My kernel module");
 MODULE_AUTHOR("yanovskyy");
@@ -43,28 +44,29 @@ typedef struct _client_work
     // unsigned char *packet;
     // int packet_len;
     struct list_head list;
+    struct socket *sock;
 } client_work;
+
+typedef struct _client_work_task
+{
+    struct work_struct work;
+    struct list_head list;
+    void *arg;
+} client_work_task;
 
 struct socket *listen_sock;
 
 LIST_HEAD(clients);
 LIST_HEAD(clients_work);
+LIST_HEAD(clients_work_tasks);
 
-static inline client_work *create_client_work(unsigned char *packet, int packet_len)
+static inline client_work *create_client_work(struct socket *sock)
 {
     client_work *cw = kmalloc(sizeof(client_work), GFP_KERNEL);
     if (!cw)
         return NULL;
 
-    // cw->packet = kzalloc(packet_len, GFP_KERNEL);
-    // if (!cw->packet)
-    // {
-    //     kfree(cw);
-    //     return NULL;
-    // }
-    // memcpy(cw->packet, packet, packet_len);
-    // cw->packet_len = packet_len;
-
+    cw->sock = sock;
     return cw;
 }
 
@@ -74,11 +76,73 @@ __attribute__((optimize("O0"))) static void infite_loop(void)
         continue;
 }
 
+static void w_cpu(struct work_struct *work)
+{
+    client_work_task *cw_task = container_of(work, client_work_task, work);
+    int size_mat = (intptr_t)cw_task->arg;
+    op_cpu_matrix_multiplication_args_t *cpu_args = op_cpu_matrix_multiplication_init(size_mat);
+    op_cpu_matrix_multiplication(cpu_args);
+    op_cpu_matrix_multiplication_free(cpu_args);
+    pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
+}
+
+static void w_disk_net(struct work_struct *work)
+{
+    client_work_task *cw_task = container_of(work, client_work_task, work);
+
+    op_disk_word_counting_args_t disk_args = {
+        .filename = "/etc/6764457a.txt",
+        .str_to_find = "a",
+    };
+    int cout = (intptr_t)op_disk_word_counting(&disk_args);
+    pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
+    op_network_send_args_t net_args = {
+        .sock = (struct socket *)cw_task->arg,
+        .size_payload = 1000,
+        .iterations = 1000,
+    };
+    op_network_send(&net_args);
+    pr_info("%s: network done\n", THIS_MODULE->name);
+}
+
 static void client_worker(struct work_struct *work)
 {
     client_work *cw = container_of(work, client_work, work);
-    pr_info("%s: Client work done\n", THIS_MODULE->name);
-    // pr_info("%s: Packet : %s\n", THIS_MODULE->name, cw->packet);
+
+    client_work_task *cw_task_cpu = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_cpu)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+
+    client_work_task *cw_task_disk_net = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_disk_net)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+    list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
+    list_add_tail(&cw_task_disk_net->list, &clients_work_tasks);
+
+    // ┌──────┐
+    // │DECODE│
+    // └┬────┬┘
+    // ┌▽──┐┌▽───┐
+    // │CPU││DISK│
+    // └───┘└┬───┘
+    // ┌─────▽┐
+    // │NET   │
+    // └──────┘
+    cw_task_cpu->arg = (void *)1000;
+    cw_task_disk_net->arg = (void *)cw->sock;
+
+    INIT_WORK(&cw_task_cpu->work, w_cpu);
+    INIT_WORK(&cw_task_disk_net->work, w_disk_net);
+    queue_work(kserver_wq_clients_work_tasks, &cw_task_cpu->work);
+    queue_work(kserver_wq_clients_work_tasks, &cw_task_disk_net->work);
+
+    // TODO: synchronize work, use another queue when on these tasks ends ?
 }
 
 static void client_handler(struct work_struct *work)
@@ -110,7 +174,7 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        client_work *cw = create_client_work(buf, ret);
+        client_work *cw = create_client_work(cl->sock);
         if (!cw)
         {
             pr_err("%s: Failed to allocate memory for client work\n", THIS_MODULE->name);
@@ -209,7 +273,7 @@ static int __init kserver_init(void)
         destroy_workqueue(kserver_wq_clients_read);
         return -ENOMEM;
     }
-    kserver_wq_clients_work_tasks = create_workqueue("wq_clients_work_tasks");
+    kserver_wq_clients_work_tasks = alloc_workqueue("wq_clients_work", WQ_CPU_INTENSIVE | WQ_HIGHPRI, 0);
     if (!kserver_wq_clients_work_tasks)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -250,8 +314,17 @@ static void free_client_work_list(void)
     list_for_each_entry_safe(cw, tmp, &clients_work, list)
     {
         list_del(&cw->list);
-        // kfree(cw->packet);
         kfree(cw);
+    }
+}
+
+static void free_client_work_tasks_list(void)
+{
+    client_work_task *cw_task, *tmp;
+    list_for_each_entry_safe(cw_task, tmp, &clients_work_tasks, list)
+    {
+        list_del(&cw_task->list);
+        kfree(cw_task);
     }
 }
 
@@ -284,6 +357,7 @@ static void __exit kserver_exit(void)
 
     free_client_list();
     free_client_work_list();
+    free_client_work_tasks_list();
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
 
