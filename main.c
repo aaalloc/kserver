@@ -189,7 +189,8 @@ static void client_handler(struct work_struct *work)
 
 clean:
     kernel_sock_shutdown(cl->sock, SHUT_RDWR);
-    kfree(buf);
+    if (buf)
+        kfree(buf);
 }
 
 /*
