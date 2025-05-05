@@ -26,9 +26,21 @@ MODULE_LICENSE("GPL");
 
 #define BUF_SIZE 4096
 
+typedef struct _queue_task
+{
+    struct workqueue_struct *wq_cpu;
+    struct workqueue_struct *wq_disk;
+    struct workqueue_struct *wq_net;
+} queue_task;
+
+static queue_task q_task = {
+    .wq_cpu = NULL,
+    .wq_disk = NULL,
+    .wq_net = NULL,
+};
+
 static struct workqueue_struct *kserver_wq_clients_read;
 static struct workqueue_struct *kserver_wq_clients_work;
-static struct workqueue_struct *kserver_wq_clients_work_tasks;
 
 static struct task_struct *kserver_thread;
 typedef struct _client
@@ -70,8 +82,9 @@ static inline client_work *create_client_work(struct socket *sock)
     return cw;
 }
 
-__attribute__((optimize("O0"))) static void infite_loop(void)
+__attribute__((optimize("O0"))) static void infite_loop(struct work_struct *work)
 {
+    (void)work;
     for (;;)
         continue;
 }
@@ -86,7 +99,19 @@ static void w_cpu(struct work_struct *work)
     pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
 }
 
-static void w_disk_net(struct work_struct *work)
+static void w_net(struct work_struct *work)
+{
+    client_work_task *cw_task = container_of(work, client_work_task, work);
+    op_network_send_args_t net_args = {
+        .sock = (struct socket *)cw_task->arg,
+        .size_payload = 10,
+        .iterations = 1,
+    };
+    op_network_send(&net_args);
+    pr_info("%s: network done\n", THIS_MODULE->name);
+}
+
+static void w_disk(struct work_struct *work)
 {
     client_work_task *cw_task = container_of(work, client_work_task, work);
 
@@ -96,13 +121,17 @@ static void w_disk_net(struct work_struct *work)
     };
     int cout = (intptr_t)op_disk_word_counting(&disk_args);
     pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
-    op_network_send_args_t net_args = {
-        .sock = (struct socket *)cw_task->arg,
-        .size_payload = 1000,
-        .iterations = 1000,
-    };
-    op_network_send(&net_args);
-    pr_info("%s: network done\n", THIS_MODULE->name);
+
+    client_work_task *cw_task_net = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_net)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+    list_add_tail(&cw_task_net->list, &clients_work_tasks);
+    cw_task_net->arg = (void *)cw_task->arg;
+    INIT_WORK(&cw_task_net->work, w_net);
+    queue_work(q_task.wq_net, &cw_task_net->work);
 }
 
 static void client_worker(struct work_struct *work)
@@ -116,14 +145,14 @@ static void client_worker(struct work_struct *work)
         return;
     }
 
-    client_work_task *cw_task_disk_net = kmalloc(sizeof(client_work_task), GFP_KERNEL);
-    if (!cw_task_disk_net)
+    client_work_task *cw_task_disk = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_disk)
     {
         pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
         return;
     }
     list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
-    list_add_tail(&cw_task_disk_net->list, &clients_work_tasks);
+    list_add_tail(&cw_task_disk->list, &clients_work_tasks);
 
     // ┌──────┐
     // │DECODE│
@@ -134,14 +163,13 @@ static void client_worker(struct work_struct *work)
     // ┌─────▽┐
     // │NET   │
     // └──────┘
-    cw_task_cpu->arg = (void *)1000;
-    cw_task_disk_net->arg = (void *)cw->sock;
+    cw_task_cpu->arg = (void *)3000;
+    cw_task_disk->arg = (void *)cw->sock;
 
     INIT_WORK(&cw_task_cpu->work, w_cpu);
-    INIT_WORK(&cw_task_disk_net->work, w_disk_net);
-    queue_work(kserver_wq_clients_work_tasks, &cw_task_cpu->work);
-    queue_work(kserver_wq_clients_work_tasks, &cw_task_disk_net->work);
-
+    INIT_WORK(&cw_task_disk->work, w_disk);
+    queue_work(q_task.wq_cpu, &cw_task_cpu->work);
+    queue_work(q_task.wq_disk, &cw_task_disk->work);
     // TODO: synchronize work, use another queue when on these tasks ends ?
 }
 
@@ -247,6 +275,36 @@ static int kserver_daemon(void *data)
     return 0;
 }
 
+static int init_queue_task(queue_task *q_task)
+{
+    q_task->wq_cpu = alloc_ordered_workqueue("wq_cpu", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+    // q_task->wq_cpu = create_freezable_workqueue("wq_cpu");
+    if (!q_task->wq_cpu)
+    {
+        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        return -ENOMEM;
+    }
+
+    q_task->wq_disk = alloc_ordered_workqueue("wq_disk", WQ_HIGHPRI);
+    if (!q_task->wq_disk)
+    {
+        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        destroy_workqueue(q_task->wq_cpu);
+        return -ENOMEM;
+    }
+
+    q_task->wq_net = alloc_ordered_workqueue("wq_net", WQ_HIGHPRI);
+    if (!q_task->wq_net)
+    {
+        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+        destroy_workqueue(q_task->wq_cpu);
+        destroy_workqueue(q_task->wq_disk);
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
 static int __init kserver_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
@@ -255,6 +313,13 @@ static int __init kserver_init(void)
     if (res < 0)
     {
         pr_err("%s: Failed to open socket: %d\n", THIS_MODULE->name, res);
+        return res;
+    }
+
+    res = init_queue_task(&q_task);
+    if (res < 0)
+    {
+        pr_err("%s: Failed to initialize queue task: %d\n", THIS_MODULE->name, res);
         return res;
     }
 
@@ -272,14 +337,6 @@ static int __init kserver_init(void)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         destroy_workqueue(kserver_wq_clients_read);
-        return -ENOMEM;
-    }
-    kserver_wq_clients_work_tasks = alloc_workqueue("wq_clients_work", WQ_CPU_INTENSIVE | WQ_HIGHPRI, 0);
-    if (!kserver_wq_clients_work_tasks)
-    {
-        pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
-        destroy_workqueue(kserver_wq_clients_read);
-        destroy_workqueue(kserver_wq_clients_work);
         return -ENOMEM;
     }
 
@@ -348,12 +405,6 @@ static void __exit kserver_exit(void)
     {
         flush_workqueue(kserver_wq_clients_work);
         destroy_workqueue(kserver_wq_clients_work);
-    }
-
-    if (kserver_wq_clients_work_tasks)
-    {
-        flush_workqueue(kserver_wq_clients_work_tasks);
-        destroy_workqueue(kserver_wq_clients_work_tasks);
     }
 
     free_client_list();
