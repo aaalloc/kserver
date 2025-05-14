@@ -86,7 +86,8 @@ __attribute__((optimize("O0"))) static void infite_loop(struct work_struct *work
 {
     (void)work;
     for (;;)
-        continue;
+        schedule();
+    // continue;
 }
 
 static void w_cpu(struct work_struct *work)
@@ -96,7 +97,7 @@ static void w_cpu(struct work_struct *work)
     op_cpu_matrix_multiplication_args_t *cpu_args = op_cpu_matrix_multiplication_init(size_mat);
     op_cpu_matrix_multiplication(cpu_args);
     op_cpu_matrix_multiplication_free(cpu_args);
-    pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
+    // pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
 }
 
 static void w_net(struct work_struct *work)
@@ -108,19 +109,20 @@ static void w_net(struct work_struct *work)
         .iterations = 1,
     };
     op_network_send(&net_args);
-    pr_info("%s: network done\n", THIS_MODULE->name);
+    // pr_info("%s: network done\n", THIS_MODULE->name);
 }
 
 static void w_disk(struct work_struct *work)
 {
     client_work_task *cw_task = container_of(work, client_work_task, work);
 
+    // pr_info("%s: Disk operation started\n", THIS_MODULE->name);
     op_disk_word_counting_args_t disk_args = {
         .filename = "/etc/6764457a.txt",
         .str_to_find = "a",
     };
     int cout = (intptr_t)op_disk_word_counting(&disk_args);
-    pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
+    // pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
 
     client_work_task *cw_task_net = kmalloc(sizeof(client_work_task), GFP_KERNEL);
     if (!cw_task_net)
@@ -138,22 +140,6 @@ static void client_worker(struct work_struct *work)
 {
     client_work *cw = container_of(work, client_work, work);
 
-    client_work_task *cw_task_cpu = kmalloc(sizeof(client_work_task), GFP_KERNEL);
-    if (!cw_task_cpu)
-    {
-        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
-        return;
-    }
-
-    client_work_task *cw_task_disk = kmalloc(sizeof(client_work_task), GFP_KERNEL);
-    if (!cw_task_disk)
-    {
-        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
-        return;
-    }
-    list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
-    list_add_tail(&cw_task_disk->list, &clients_work_tasks);
-
     // ┌──────┐
     // │DECODE│
     // └┬────┬┘
@@ -163,13 +149,36 @@ static void client_worker(struct work_struct *work)
     // ┌─────▽┐
     // │NET   │
     // └──────┘
-    cw_task_cpu->arg = (void *)3000;
-    cw_task_disk->arg = (void *)cw->sock;
+    client_work_task *cw_task_cpu = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_cpu)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+
+    list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
+
+    cw_task_cpu->arg = (void *)1000;
 
     INIT_WORK(&cw_task_cpu->work, w_cpu);
-    INIT_WORK(&cw_task_disk->work, w_disk);
     queue_work(q_task.wq_cpu, &cw_task_cpu->work);
-    queue_work(q_task.wq_disk, &cw_task_disk->work);
+    // INIT_WORK(&cw_task_cpu->work, infite_loop);
+
+    int n_w_disk = 1;
+    for (int i = 0; i < n_w_disk; i++)
+    {
+        client_work_task *cw_task_disk = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+        if (!cw_task_disk)
+        {
+            pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+            return;
+        }
+        list_add_tail(&cw_task_disk->list, &clients_work_tasks);
+        cw_task_disk->arg = (void *)cw->sock;
+        INIT_WORK(&cw_task_disk->work, w_disk);
+        queue_work(q_task.wq_disk, &cw_task_disk->work);
+    }
+
     // TODO: synchronize work, use another queue when on these tasks ends ?
 }
 
@@ -198,7 +207,7 @@ static void client_handler(struct work_struct *work)
         }
         if (ret == 0)
         {
-            pr_info("%s: Connection closed by peer\n", THIS_MODULE->name);
+            // pr_info("%s: Connection closed by peer\n", THIS_MODULE->name);
             goto clean;
         }
 
@@ -212,7 +221,7 @@ static void client_handler(struct work_struct *work)
         list_add_tail(&cw->list, &clients_work);
         INIT_WORK(&cw->work, client_worker);
         queue_work(kserver_wq_clients_work, &cw->work);
-        pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
+        // pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
 clean:
@@ -277,7 +286,19 @@ static int kserver_daemon(void *data)
 
 static int init_queue_task(queue_task *q_task)
 {
-    q_task->wq_cpu = alloc_ordered_workqueue("wq_cpu", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+    // q_task->wq_cpu = alloc_workqueue("wq_cpu", WQ_HIGHPRI | WQ_UNBOUND | WQ_SYSFS, 0);
+    q_task->wq_cpu = alloc_workqueue("wq_cpu", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+
+    // struct workqueue_attrs *attrs = q_task->wq_cpu->unbound_attrs;
+
+    // // cpu 0 only
+    // cpumask_clear(attrs->cpumask);
+    // cpumask_set_cpu(0, attrs->cpumask);
+
+    // apply_workqueue_attrs(q_task->wq_cpu, attrs);
+    // free_workqueue_attrs(attrs);
+
+    // q_task->wq_cpu = alloc_workqueue("wq_cpu", WQ_HIGHPRI | WQ_CPU_INTENSIVE | WQ_UNBOUND, 0);
     // q_task->wq_cpu = create_freezable_workqueue("wq_cpu");
     if (!q_task->wq_cpu)
     {
@@ -285,7 +306,7 @@ static int init_queue_task(queue_task *q_task)
         return -ENOMEM;
     }
 
-    q_task->wq_disk = alloc_ordered_workqueue("wq_disk", WQ_HIGHPRI);
+    q_task->wq_disk = alloc_workqueue("wq_disk", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
     if (!q_task->wq_disk)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -293,7 +314,7 @@ static int init_queue_task(queue_task *q_task)
         return -ENOMEM;
     }
 
-    q_task->wq_net = alloc_ordered_workqueue("wq_net", WQ_HIGHPRI);
+    q_task->wq_net = alloc_workqueue("wq_net", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
     if (!q_task->wq_net)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -326,7 +347,7 @@ static int __init kserver_init(void)
     // Note for the future: have a check on flags, espcially
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
-    kserver_wq_clients_read = create_workqueue("wq_clients");
+    kserver_wq_clients_read = alloc_workqueue("wq_clients_read", WQ_UNBOUND, 0);
     if (!kserver_wq_clients_read)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -410,6 +431,25 @@ static void __exit kserver_exit(void)
     free_client_list();
     free_client_work_list();
     free_client_work_tasks_list();
+
+    if (q_task.wq_cpu)
+    {
+        flush_workqueue(q_task.wq_cpu);
+        destroy_workqueue(q_task.wq_cpu);
+    }
+
+    if (q_task.wq_disk)
+    {
+        flush_workqueue(q_task.wq_disk);
+        destroy_workqueue(q_task.wq_disk);
+    }
+
+    if (q_task.wq_net)
+    {
+        flush_workqueue(q_task.wq_net);
+        destroy_workqueue(q_task.wq_net);
+    }
+
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
 

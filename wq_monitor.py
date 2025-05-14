@@ -84,12 +84,12 @@ class WorkerPool():
         self.cpus = cpumask_str(_pool.attrs.cpumask)
         self.bh = _pool.flags & POOL_BH
         self.unbound = _pool.cpu < 0
-        self.nr_running = _pool.nr_running.value_()
+        self.nr_running = _pool.nr_running
 
     def __str__(self):
         s = f'pool[{self.id:0{max_pool_id_len}}] flags=0x{self.flags:02x} ref={self.refcnt:{max_ref_len}} nice={self.nice:3} '
         s += f'idle/workers={self.nr_idle:3}/{self.nr_workers:3} '
-        s += f'nr_running={self.nr_running:6}    '
+        s += f'nr_running={self.nr_running}    '
         if self.cpu >= 0:
             s += f'cpu={self.cpu:3}'
             if self.bh:
