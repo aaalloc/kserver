@@ -72,6 +72,10 @@ LIST_HEAD(clients);
 LIST_HEAD(clients_work);
 LIST_HEAD(clients_work_tasks);
 
+static void create_task_net(void *arg);
+static void create_task_cpu(void *arg);
+static void create_task_disk(void *arg);
+
 static inline client_work *create_client_work(struct socket *sock)
 {
     client_work *cw = kmalloc(sizeof(client_work), GFP_KERNEL);
@@ -124,6 +128,11 @@ static void w_disk(struct work_struct *work)
     int cout = (intptr_t)op_disk_word_counting(&disk_args);
     // pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
 
+    create_task_net(cw_task->arg);
+}
+
+static void create_task_net(void *arg)
+{
     client_work_task *cw_task_net = kmalloc(sizeof(client_work_task), GFP_KERNEL);
     if (!cw_task_net)
     {
@@ -131,9 +140,40 @@ static void w_disk(struct work_struct *work)
         return;
     }
     list_add_tail(&cw_task_net->list, &clients_work_tasks);
-    cw_task_net->arg = (void *)cw_task->arg;
+    cw_task_net->arg = arg;
     INIT_WORK(&cw_task_net->work, w_net);
     queue_work(q_task.wq_net, &cw_task_net->work);
+}
+
+static void create_task_cpu(void *arg)
+{
+    client_work_task *cw_task_cpu = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_cpu)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+
+    list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
+
+    cw_task_cpu->arg = arg;
+
+    INIT_WORK(&cw_task_cpu->work, w_cpu);
+    queue_work(q_task.wq_cpu, &cw_task_cpu->work);
+}
+
+static void create_task_disk(void *arg)
+{
+    client_work_task *cw_task_disk = kmalloc(sizeof(client_work_task), GFP_KERNEL);
+    if (!cw_task_disk)
+    {
+        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
+        return;
+    }
+    list_add_tail(&cw_task_disk->list, &clients_work_tasks);
+    cw_task_disk->arg = arg;
+    INIT_WORK(&cw_task_disk->work, w_disk);
+    queue_work(q_task.wq_disk, &cw_task_disk->work);
 }
 
 static void client_worker(struct work_struct *work)
@@ -149,35 +189,13 @@ static void client_worker(struct work_struct *work)
     // ┌─────▽┐
     // │NET   │
     // └──────┘
-    client_work_task *cw_task_cpu = kmalloc(sizeof(client_work_task), GFP_KERNEL);
-    if (!cw_task_cpu)
-    {
-        pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
-        return;
-    }
+    create_task_cpu((void *)1000);
 
-    list_add_tail(&cw_task_cpu->list, &clients_work_tasks);
-
-    cw_task_cpu->arg = (void *)1000;
-
-    INIT_WORK(&cw_task_cpu->work, w_cpu);
-    queue_work(q_task.wq_cpu, &cw_task_cpu->work);
     // INIT_WORK(&cw_task_cpu->work, infite_loop);
 
     int n_w_disk = 1;
     for (int i = 0; i < n_w_disk; i++)
-    {
-        client_work_task *cw_task_disk = kmalloc(sizeof(client_work_task), GFP_KERNEL);
-        if (!cw_task_disk)
-        {
-            pr_err("%s: Failed to allocate memory for client work task\n", THIS_MODULE->name);
-            return;
-        }
-        list_add_tail(&cw_task_disk->list, &clients_work_tasks);
-        cw_task_disk->arg = (void *)cw->sock;
-        INIT_WORK(&cw_task_disk->work, w_disk);
-        queue_work(q_task.wq_disk, &cw_task_disk->work);
-    }
+        create_task_disk((void *)cw->sock);
 
     // TODO: synchronize work, use another queue when on these tasks ends ?
 }
