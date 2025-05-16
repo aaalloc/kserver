@@ -133,8 +133,9 @@ class WorkQueue():
 
         s = f'{self.name:{WQ_NAME_LEN}}\n'
         s += f' ├─flags=0x{self.flags:02x} type={wq_type_str(self._wq):4}\n'
-        for pool in self._pools:
-            s += f' ├─{WorkerPool(pool)}\n'
+        if verbose:
+            for pool in self._pools:
+                s += f' ├─{WorkerPool(pool)}\n'
         s += f' ├─nr_active={self.nr_active:8}\n'
         s += f' ├─started={self._stats[PWQ_STAT_STARTED]:8} '
         s += f'completed={self._stats[PWQ_STAT_COMPLETED]:8} '
@@ -190,6 +191,7 @@ def wq_type_str(wq):
 
 
 exit_req = False
+verbose = False
 
 
 def sigint_handler(signr, frame):
@@ -205,7 +207,13 @@ if __name__ == "__main__":
                         help='a name of the workqueue')
     parser.add_argument('-i', '--interval', metavar='SECS', type=float, default=1,
                         help='Monitoring interval (0 to print once and exit)')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='Print verbose information')
+
     args = parser.parse_args()
+
+    if args.verbose:
+        verbose = True
 
     signal.signal(signal.SIGINT, sigint_handler)
     while not exit_req:
