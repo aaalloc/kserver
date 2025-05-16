@@ -216,13 +216,22 @@ if __name__ == "__main__":
         verbose = True
 
     signal.signal(signal.SIGINT, sigint_handler)
+    i = 0
     while not exit_req:
         for wq in list_for_each_entry('struct workqueue_struct', workqueues.address_of_(), 'list'):
             if wq.name.string_().decode() not in args.workqueue_names:
                 continue
+            # delemite with number iteratation
+            sys.stdout.write(
+                f'Iteration: {i} --------------------------------------------------\n'
+            )
             wq = WorkQueue(_wq=wq)
             sys.stdout.write(f'{wq}\n')
+            sys.stdout.write(
+                f'--------------------------------------------------\n\n\n'
+            )
         sys.stdout.flush()
         if args.interval == 0:
             break
         time.sleep(args.interval)
+        i += 1
