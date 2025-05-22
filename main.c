@@ -18,6 +18,7 @@
 #include <linux/version.h>
 
 #include "ksocket_handler.h"
+#include "mom.h"
 #include "operations.h"
 #include "task.h"
 
@@ -70,30 +71,21 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        struct task t = {.sock = cl->sock,
-                         .args.disk_args = {
-                             .filename = "/etc/6764457a.txt",
-                             .str_to_find = "a",
-                         }};
+        // struct task t = {.sock = cl->sock,
+        //                  .args.disk_args = {
+        //                      .filename = "/etc/6764457a.txt",
+        //                      .str_to_find = "a",
+        //                  }};
 
-        struct client_work *cw = create_task(t, TASK_DISK);
-        if (unlikely(!cw))
-        {
-            pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
-            continue;
-        }
-
-        queue_work(kserver_wq_clients_read, &cw->work);
-        // client_work *cw = create_client_work(cl->sock);
-        // if (!cw)
+        // struct client_work *cw = create_task(t, TASK_DISK);
+        // if (unlikely(!cw))
         // {
-        //     pr_err("%s: Failed to allocate memory for client work\n", THIS_MODULE->name);
-        //     goto clean;
+        //     pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
+        //     continue;
         // }
 
-        // list_add_tail(&cw->list, &clients_work);
-        // INIT_WORK(&cw->work, client_worker);
-        // queue_work(kserver_wq_clients_work, &cw->work);
+        // queue_work(kserver_wq_clients_read, &cw->work);
+        mom_publish_start(cl->sock);
         pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 

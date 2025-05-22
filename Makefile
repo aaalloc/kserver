@@ -9,6 +9,7 @@ kserver-y := main.o
 kserver-y += ksocket_handler.o
 kserver-y += operations.o
 kserver-y += task.o
+kserver-y += mom.o
 
 obj-m := kserver.o
 
