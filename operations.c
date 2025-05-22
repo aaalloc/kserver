@@ -10,24 +10,21 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 
-op_cpu_matrix_multiplication_args_t *op_cpu_matrix_multiplication_init(int size)
+int op_cpu_matrix_multiplication_init(op_cpu_matrix_multiplication_args_t *args)
 {
-    op_cpu_matrix_multiplication_args_t *args = kmalloc(sizeof(op_cpu_matrix_multiplication_args_t), GFP_KERNEL);
-    if (!args)
-        return NULL;
-    args->size = size;
+    int size = args->size;
     args->a = kzalloc(size * sizeof(int *), GFP_KERNEL);
     if (!args->a)
     {
         kfree(args);
-        return NULL;
+        return -1;
     }
     args->b = kzalloc(size * sizeof(int *), GFP_KERNEL);
     if (!args->b)
     {
         kfree(args->a);
         kfree(args);
-        return NULL;
+        return -1;
     }
     args->result = kzalloc(size * sizeof(int *), GFP_KERNEL);
     if (!args->result)
@@ -35,7 +32,7 @@ op_cpu_matrix_multiplication_args_t *op_cpu_matrix_multiplication_init(int size)
         kfree(args->b);
         kfree(args->a);
         kfree(args);
-        return NULL;
+        return -1;
     }
 
     for (int i = 0; i < size; i++)
@@ -49,7 +46,7 @@ op_cpu_matrix_multiplication_args_t *op_cpu_matrix_multiplication_init(int size)
             kfree(args->b);
             kfree(args->a);
             kfree(args);
-            return NULL;
+            return -1;
         }
         args->b[i] = kzalloc(size * sizeof(int), GFP_KERNEL);
         if (!args->b[i])
@@ -60,7 +57,7 @@ op_cpu_matrix_multiplication_args_t *op_cpu_matrix_multiplication_init(int size)
             kfree(args->b);
             kfree(args->a);
             kfree(args);
-            return NULL;
+            return -1;
         }
         args->result[i] = kzalloc(size * sizeof(int), GFP_KERNEL);
         if (!args->result[i])
@@ -73,42 +70,37 @@ op_cpu_matrix_multiplication_args_t *op_cpu_matrix_multiplication_init(int size)
             kfree(args->b);
             kfree(args->a);
             kfree(args);
-            return NULL;
+            return -1;
         }
     }
 
-    return args;
+    return 1;
 }
 void op_cpu_matrix_multiplication_free(op_cpu_matrix_multiplication_args_t *args)
 {
-    if (args)
+    for (int i = 0; i < args->size; i++)
     {
-        for (int i = 0; i < args->size; i++)
-        {
-            kfree(args->a[i]);
-            kfree(args->b[i]);
-            kfree(args->result[i]);
-        }
-        kfree(args->result);
-        kfree(args->b);
-        kfree(args->a);
-        kfree(args);
+        kfree(args->a[i]);
+        kfree(args->b[i]);
+        kfree(args->result[i]);
     }
+    kfree(args->result);
+    kfree(args->b);
+    kfree(args->a);
 }
-void *op_cpu_matrix_multiplication(void *args)
+
+void op_cpu_matrix_multiplication(op_cpu_matrix_multiplication_args_t *args)
 {
-    op_cpu_matrix_multiplication_args_t *op_args = (op_cpu_matrix_multiplication_args_t *)args;
-    int size = op_args->size;
+    int size = args->size;
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
         {
-            op_args->result[i][j] = 0;
+            args->result[i][j] = 0;
             for (int k = 0; k < size; k++)
-                op_args->result[i][j] += op_args->a[i][k] * op_args->b[k][j];
+                args->result[i][j] += args->a[i][k] * args->b[k][j];
         }
     }
-    return NULL;
 }
 
 void read_file(char *filename)
@@ -138,24 +130,24 @@ void read_file(char *filename)
         filp_close(file, NULL);
 }
 
-void *op_disk_word_counting(void *args)
+int op_disk_word_counting(op_disk_word_counting_args_t *args)
 {
-    op_disk_word_counting_args_t *op_args = (op_disk_word_counting_args_t *)args;
-    char *filename = op_args->filename;
-    char *str_to_find = op_args->str_to_find;
+    char *filename = args->filename;
+    char *str_to_find = args->str_to_find;
 
     struct file *file = filp_open(filename, O_RDONLY, 0);
     if (IS_ERR(file))
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(file));
-        return NULL;
+        return -1;
     }
 
     unsigned char *buf = kzalloc(4096, GFP_KERNEL);
     if (!buf)
     {
+        pr_err("Failed to allocate memory for buffer\n");
         filp_close(file, NULL);
-        return NULL;
+        return -ENOMEM;
     }
 
     int count = 0;
@@ -181,18 +173,18 @@ void *op_disk_word_counting(void *args)
 
     if (file)
         filp_close(file, NULL);
-    return (void *)(long)count;
+    return count;
 }
-void *op_network_send(void *args)
+
+int op_network_send(op_network_send_args_t *args)
 {
-    op_network_send_args_t *op_args = (op_network_send_args_t *)args;
-    int size_payload = op_args->size_payload;
-    struct socket *sock = op_args->sock;
-    int iterations = op_args->iterations;
+    int size_payload = args->size_payload;
+    struct socket *sock = args->sock;
+    int iterations = args->iterations;
 
     char *buf = kmalloc(size_payload, GFP_KERNEL);
     if (!buf)
-        return NULL;
+        return -1;
     memset(buf, 'A', size_payload);
 
     for (int i = 0; i < iterations; i++)
@@ -212,5 +204,5 @@ void *op_network_send(void *args)
     }
 clean:
     kfree(buf);
-    return NULL;
+    return 0;
 }
