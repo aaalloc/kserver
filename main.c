@@ -153,6 +153,12 @@ static int __init kserver_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
 
+    if (mom_publish_init() < 0)
+    {
+        pr_err("%s: Failed to initialize MOM publish\n", THIS_MODULE->name);
+        return -ENOMEM;
+    }
+
     int res = open_lsocket(&listen_sock, 12345);
     if (res < 0)
     {

@@ -16,8 +16,8 @@ void w_cpu(struct work_struct *work)
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
         struct next_workqueue *next_wq = &c_task->next_works[i];
-        INIT_WORK(next_wq->work, next_wq->func);
-        queue_work(next_wq->wq, next_wq->work);
+        INIT_WORK(&next_wq->cw->work, next_wq->func);
+        queue_work(next_wq->wq, &next_wq->cw->work);
     }
 }
 
@@ -50,13 +50,13 @@ void w_disk(struct work_struct *work)
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
         struct next_workqueue *next_wq = &c_task->next_works[i];
-        INIT_WORK(next_wq->work, next_wq->func);
-        queue_work(next_wq->wq, next_wq->work);
+        INIT_WORK(&next_wq->cw->work, next_wq->func);
+        queue_work(next_wq->wq, &next_wq->cw->work);
     }
 }
 
 struct client_work *create_task(struct task t, enum task_type type, int total_next_workqueue,
-                                struct next_workqueue next_works[total_next_workqueue])
+                                struct next_workqueue next_works[])
 {
     struct client_work *cw_task_net = kmalloc(sizeof(cw_task_net), GFP_KERNEL);
     if (!cw_task_net)
