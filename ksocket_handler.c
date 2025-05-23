@@ -17,8 +17,12 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 
-int ksocket_read(struct socket *sock, unsigned char *buf, int len)
+int ksocket_read(struct ksocket_handler handler)
 {
+    struct socket *sock = handler.sock;
+    unsigned char *buf = handler.buf;
+    int len = handler.len;
+
     struct msghdr msg = {0};
     struct kvec vec;
     int ret;
@@ -32,6 +36,25 @@ int ksocket_read(struct socket *sock, unsigned char *buf, int len)
     ret = kernel_recvmsg(sock, &msg, &vec, 1, len, msg.msg_flags);
     if (ret < 0)
         pr_err("%s: kernel_recvmsg failed: %d\n", THIS_MODULE->name, ret);
+    return ret;
+}
+
+int ksocket_write(struct ksocket_handler handler)
+{
+    struct socket *sock = handler.sock;
+    unsigned char *buf = handler.buf;
+    int len = handler.len;
+
+    struct msghdr msg = {0};
+    struct kvec vec;
+    int ret;
+
+    vec.iov_base = buf;
+    vec.iov_len = len;
+
+    ret = kernel_sendmsg(sock, &msg, &vec, 1, len);
+    if (ret < 0)
+        pr_err("%s: kernel_sendmsg failed: %d\n", THIS_MODULE->name, ret);
     return ret;
 }
 

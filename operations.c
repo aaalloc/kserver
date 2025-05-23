@@ -1,4 +1,5 @@
 #include "operations.h"
+#include "ksocket_handler.h"
 #include <linux/slab.h>
 #include <linux/tcp.h>
 
@@ -189,19 +190,14 @@ int op_network_send(op_network_send_args_t *args)
 
     for (int i = 0; i < iterations; i++)
     {
-        struct msghdr msg = {0};
-        struct kvec vec;
-        int ret;
-        vec.iov_base = buf;
-        vec.iov_len = size_payload;
-
-        ret = kernel_sendmsg(sock, &msg, &vec, 1, size_payload);
-        if (ret < 0)
-        {
-            pr_err("Failed to send message: %d\n", ret);
+        if (ksocket_write((struct ksocket_handler){
+                .sock = sock,
+                .buf = buf,
+                .len = size_payload,
+            }) < 0)
             goto clean;
-        }
     }
+
 clean:
     kfree(buf);
     return 0;

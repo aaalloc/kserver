@@ -12,3 +12,5 @@ int mom_publish_init(void);
  * @s: socket to use for the publish process
  */
 int mom_publish_start(struct socket *s);
+
+void mom_publish_free_wq(void);

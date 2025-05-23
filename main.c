@@ -59,7 +59,11 @@ static void client_handler(struct work_struct *work)
     // after ksocket_read has been done
     for (;;)
     {
-        int ret = ksocket_read(cl->sock, buf, BUF_SIZE);
+        int ret = ksocket_read((struct ksocket_handler){
+            .sock = cl->sock,
+            .buf = buf,
+            .len = BUF_SIZE,
+        });
         if (ret < 0)
         {
             pr_err("%s: ksocket_read failed: %d\n", THIS_MODULE->name, ret);
@@ -71,20 +75,6 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        // struct task t = {.sock = cl->sock,
-        //                  .args.disk_args = {
-        //                      .filename = "/etc/6764457a.txt",
-        //                      .str_to_find = "a",
-        //                  }};
-
-        // struct client_work *cw = create_task(t, TASK_DISK);
-        // if (unlikely(!cw))
-        // {
-        //     pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
-        //     continue;
-        // }
-
-        // queue_work(kserver_wq_clients_read, &cw->work);
         mom_publish_start(cl->sock);
         pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
@@ -217,8 +207,10 @@ static void __exit kserver_exit(void)
         destroy_workqueue(kserver_wq_clients_read);
     }
 
+    mom_publish_free_wq();
     free_client_list();
     free_client_work_list();
+    free_work_watchdog_list();
 
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
