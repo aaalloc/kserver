@@ -122,8 +122,9 @@ int mom_publish_start(struct socket *s)
 
     ww->works_left = (atomic_t){.counter = 4};
 
-    ww->arg = (struct ksocket_handler){.sock = s, .buf = (unsigned char[]){0x022}, .len = 1};
-    ww->func = (void (*)(void *))ksocket_write;
+    // ww->arg = (struct ksocket_handler){.sock = s, .buf = (unsigned char[]){0x022}, .len = 1};
+    // ww->func = (void (*)(void *))ksocket_write;
+    ww->sock = s;
 
     init_waitqueue_head(&ww->wait_any_work_done);
 

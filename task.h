@@ -55,9 +55,10 @@ struct work_watchdog
     atomic_t works_left;
     wait_queue_head_t wait_any_work_done;
     // TODO: arg need to be generic
-    struct ksocket_handler arg;
-    void (*func)(void *);
+    // struct ksocket_handler arg;
+    // void (*func)(void *);
     // void *func;
+    struct socket *sock;
     struct list_head list;
 };
 

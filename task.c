@@ -4,7 +4,11 @@
 void ww_loop(struct work_struct *work)
 {
     struct work_watchdog *ww = container_of(work, struct work_watchdog, work);
-    ww->func(&ww->arg);
+    ksocket_write((struct ksocket_handler){
+        .sock = ww->sock,
+        .buf = "end___",
+        .len = 6,
+    });
 }
 
 void w_cpu(struct work_struct *work)
