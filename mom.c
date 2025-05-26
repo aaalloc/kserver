@@ -113,7 +113,7 @@ int mom_publish_start(struct socket *s)
         return -ENOMEM;
     }
     ww->wq = mom_work_watchdog;
-    INIT_WORK(&ww->work, ww_loop);
+    INIT_WORK(&ww->work, ww_call);
 
     list_add(&cw_cpu_1->list, &lclients_works);
     list_add(&cw_cpu_2->list, &lclients_works);
