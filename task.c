@@ -63,10 +63,10 @@ void w_disk(struct work_struct *work)
 {
     struct client_work *c_task = container_of(work, struct client_work, work);
     // TODO: make generic call function here
-    int cout = op_disk_word_counting(&c_task->t.args.disk_args);
-    if (unlikely(cout < 0))
+    int ret = op_disk_write(&c_task->t.args.disk_args);
+    if (unlikely(ret < 0))
     {
-        pr_err("%s: Failed to w_disk: %d\n", THIS_MODULE->name, cout);
+        pr_err("%s: Failed to w_disk: %d\n", THIS_MODULE->name, ret);
         return;
     }
 

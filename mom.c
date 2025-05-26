@@ -160,8 +160,11 @@ int mom_publish_start(struct socket *s)
         .t =
             {
                 .sock = s,
-                .args.disk_args = {.filename = "/etc/6764457a.txt", // Example file, should exist
-                                   .args.word_counting = {.str_to_find = "a"}},
+                .args.disk_args = {.filename = "/tmp/mom_disk_write.txt",
+                                   // TODO: for write, I think random value is better
+                                   .args.write = {.to_write = "hello_world_something",
+                                                  .len_to_write = 22,
+                                                  .iterations = 10000}},
             },
         .total_next_workqueue = 0,
         .next_works = {},
