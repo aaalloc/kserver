@@ -184,6 +184,80 @@ int op_disk_word_counting(op_disk_args_t *args)
     return count;
 }
 
+#define BUFFER_SIZE 4096
+ssize_t op_disk_read(op_disk_args_t *args)
+{
+    char *filename = args->filename;
+    int len_to_read = args->args.read.len_to_read;
+
+    struct file *file = filp_open(filename, O_RDONLY, 0);
+    if (IS_ERR(file))
+    {
+        pr_err("Failed to open file: %ld\n", PTR_ERR(file));
+        return -1;
+    }
+
+    unsigned char *buf = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+    if (!buf)
+    {
+        pr_err("Failed to allocate memory for buffer\n");
+        filp_close(file, NULL);
+        return -ENOMEM;
+    }
+
+    int total_read = 0;
+    ssize_t ret_read;
+    while (total_read < len_to_read)
+    {
+        ret_read = kernel_read(file, buf, BUFFER_SIZE, &file->f_pos);
+        if (ret_read < 0)
+        {
+            pr_err("Failed to read file: %ld\n", ret_read);
+            kfree(buf);
+            filp_close(file, NULL);
+            return ret_read;
+        }
+        if (ret_read == 0)
+            break; // EOF
+
+        total_read += ret_read;
+    }
+
+    kfree(buf);
+    filp_close(file, NULL);
+    return total_read;
+}
+
+ssize_t op_disk_write(op_disk_args_t *args)
+{
+    char *filename = args->filename;
+    unsigned char *to_write = args->args.write.to_write;
+    int len_to_write = args->args.write.len_to_write;
+    int iterations = args->args.write.iterations;
+
+    struct file *file = filp_open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (IS_ERR(file))
+    {
+        pr_err("Failed to open file: %ld\n", PTR_ERR(file));
+        return -1;
+    }
+
+    ssize_t ret;
+    for (int i = 0; i < iterations; i++)
+    {
+        ret = kernel_write(file, to_write, len_to_write, &file->f_pos);
+        if (ret < 0)
+        {
+            pr_err("Failed to write to file: %zd\n", ret);
+            filp_close(file, NULL);
+            return ret;
+        }
+    }
+
+    filp_close(file, NULL);
+    return 0;
+}
+
 int op_network_send(op_network_args_t *args)
 {
     int size_payload = args->args.send.size_payload;

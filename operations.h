@@ -1,6 +1,5 @@
 #pragma once
 #include <linux/types.h>
-
 typedef struct
 {
     union
@@ -26,7 +25,7 @@ typedef struct
         } read;
         struct
         {
-            uint16_t *to_write;
+            unsigned char *to_write;
             int len_to_write;
             int iterations;
         } write;
@@ -55,6 +54,7 @@ void op_cpu_matrix_multiplication_free(op_cpu_args_t *args);
 void op_cpu_matrix_multiplication(op_cpu_args_t *args);
 
 int op_disk_word_counting(op_disk_args_t *args);
-int op_disk_read(op_disk_args_t *args);
+ssize_t op_disk_read(op_disk_args_t *args);
+ssize_t op_disk_write(op_disk_args_t *args);
 
 int op_network_send(op_network_args_t *args);
