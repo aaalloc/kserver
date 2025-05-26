@@ -16,7 +16,7 @@
 #define DEFAULT_NUM_REQUESTS 1000
 #define DEFAULT_NUM_THREADS 50
 #define BUFFER_SIZE 1024
-#define END_FLAG "end___"
+#define END_FLAG 0x1337 // Magic number to indicate end of response
 
 // Structure pour les arguments du programme
 struct arguments_t
@@ -147,7 +147,7 @@ void *send_request(void *arg)
     for (int i = 0; i < data->requests_per_thread; i++)
     {
         struct timespec start_time, end_time;
-        char buffer[BUFFER_SIZE];
+        uint16_t buffer[BUFFER_SIZE];
 
         clock_gettime(CLOCK_MONOTONIC, &start_time);
 
@@ -158,19 +158,29 @@ void *send_request(void *arg)
         }
 
     receive:;
-        ssize_t bytes_received = recv(sock, buffer, BUFFER_SIZE - 1, 0);
-        if (bytes_received > 0)
+        ssize_t bytes_received = recv(sock, buffer, BUFFER_SIZE, 0);
+        if (bytes_received < 0)
         {
-            if (strcmp(buffer, END_FLAG) != 0)
-            {
-                printf("Received response: %s\n", buffer);
-                memset(buffer, 0, BUFFER_SIZE);
-                goto receive; // Continue receiving until we get the end flag
-            }
-            clock_gettime(CLOCK_MONOTONIC, &end_time);
-            response_times[valid_responses] = get_time_diff(start_time, end_time);
-            valid_responses++;
+            fprintf(stderr, "Receive failed: %s\n", strerror(errno));
+            continue;
         }
+        else if (bytes_received == 0)
+        {
+            printf("Server closed connection\n");
+            break; // Server closed connection
+        }
+        else if (bytes_received == 1)
+        {
+            if (buffer[0] == END_FLAG)
+            {
+                clock_gettime(CLOCK_MONOTONIC, &end_time);
+                response_times[valid_responses] = get_time_diff(start_time, end_time);
+                valid_responses++;
+                continue; // Valid response received
+            }
+        }
+        printf("Buffer: %s\n", (char *)buffer);
+        goto receive; // Continue receiving until we get END_FLAG
     }
 
     if (close(sock) < 0)

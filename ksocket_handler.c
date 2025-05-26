@@ -20,7 +20,7 @@
 int ksocket_read(struct ksocket_handler handler)
 {
     struct socket *sock = handler.sock;
-    unsigned char *buf = handler.buf;
+    uint16_t *buf = handler.buf;
     int len = handler.len;
 
     struct msghdr msg = {0};
@@ -42,7 +42,7 @@ int ksocket_read(struct ksocket_handler handler)
 int ksocket_write(struct ksocket_handler handler)
 {
     struct socket *sock = handler.sock;
-    unsigned char *buf = handler.buf;
+    uint16_t *buf = handler.buf;
     int len = handler.len;
 
     struct msghdr msg = {0};

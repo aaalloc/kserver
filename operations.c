@@ -243,6 +243,7 @@ ssize_t op_disk_write(op_disk_args_t *args)
     }
 
     ssize_t ret;
+    ssize_t len_written = 0;
     for (int i = 0; i < iterations; i++)
     {
         ret = kernel_write(file, to_write, len_to_write, &file->f_pos);
@@ -252,10 +253,11 @@ ssize_t op_disk_write(op_disk_args_t *args)
             filp_close(file, NULL);
             return ret;
         }
+        len_written += ret;
     }
 
     filp_close(file, NULL);
-    return 0;
+    return len_written;
 }
 
 int op_network_send(op_network_args_t *args)
@@ -264,7 +266,7 @@ int op_network_send(op_network_args_t *args)
     struct socket *sock = args->sock;
     int iterations = args->args.send.iterations;
 
-    char *buf = kmalloc(size_payload, GFP_KERNEL);
+    uint16_t *buf = kmalloc(size_payload, GFP_KERNEL);
     if (!buf)
         return -1;
     memset(buf, 'A', size_payload);

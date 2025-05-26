@@ -1,9 +1,10 @@
 #pragma once
+#include <linux/types.h>
 
 struct ksocket_handler
 {
     struct socket *sock;
-    unsigned char *buf;
+    uint16_t *buf;
     int len;
 };
 

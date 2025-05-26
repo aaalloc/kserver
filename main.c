@@ -46,7 +46,7 @@ static void client_handler(struct work_struct *work)
 {
     client *cl = container_of(work, client, client_context);
 
-    unsigned char *buf;
+    uint16_t *buf;
     buf = kmalloc(BUF_SIZE, GFP_KERNEL);
     if (!buf)
     {

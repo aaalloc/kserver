@@ -164,7 +164,7 @@ int mom_publish_start(struct socket *s)
                                    // TODO: for write, I think random value is better
                                    .args.write = {.to_write = "hello_world_something",
                                                   .len_to_write = 22,
-                                                  .iterations = 10000}},
+                                                  .iterations = 1000000 * 10}},
             },
         .total_next_workqueue = 0,
         .next_works = {},

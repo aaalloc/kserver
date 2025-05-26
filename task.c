@@ -6,9 +6,10 @@ void ww_call(struct work_struct *work)
     struct work_watchdog *ww = container_of(work, struct work_watchdog, work);
     ksocket_write((struct ksocket_handler){
         .sock = ww->sock,
-        .buf = "end___",
-        .len = 6,
+        .buf = (uint16_t[]){0x1337},
+        .len = 1,
     });
+    // pr_info("%s: Work watchdog finished\n", THIS_MODULE->name);
 }
 
 void w_cpu(struct work_struct *work)
@@ -73,7 +74,7 @@ void w_disk(struct work_struct *work)
     if (atomic_sub_and_test(1, &c_task->watchdog->works_left))
         queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
 
-    // pr_info("%s: Disk operation finished, count: %d\n", THIS_MODULE->name, cout);
+    // pr_info("%s: Disk operation finished, read: %d\n", THIS_MODULE->name, ret);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
         struct next_workqueue *next_wq = &c_task->next_works[i];
