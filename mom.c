@@ -133,7 +133,7 @@ int mom_publish_start(struct socket *s)
         .t =
             {
                 .sock = s,
-                .args.net_args = {.sock = s, .size_payload = 10, .iterations = 1},
+                .args.net_args = {.sock = s, .args.send = {.size_payload = 10, .iterations = 1}},
             },
         .total_next_workqueue = 0,
         .next_works = {},
@@ -145,7 +145,10 @@ int mom_publish_start(struct socket *s)
         .t =
             {
                 .sock = s,
-                .args.cpu_args = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                .args.cpu_args.args =
+                    {
+                        .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                    },
             },
         .total_next_workqueue = 1,
         .next_works = {{.wq = mom_third_step, .cw = cw_net_3, .func = w_net}},
@@ -157,7 +160,8 @@ int mom_publish_start(struct socket *s)
         .t =
             {
                 .sock = s,
-                .args.disk_args = {.filename = "/etc/6764457a.txt", .str_to_find = "a"},
+                .args.disk_args = {.filename = "/etc/6764457a.txt", // Example file, should exist
+                                   .args.word_counting = {.str_to_find = "a"}},
             },
         .total_next_workqueue = 0,
         .next_works = {},
@@ -169,7 +173,10 @@ int mom_publish_start(struct socket *s)
         .t =
             {
                 .sock = s,
-                .args.cpu_args = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                .args.cpu_args.args =
+                    {
+                        .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                    },
             },
         .total_next_workqueue = 2,
         .next_works = {{.wq = mom_second_step_cpu, .cw = cw_cpu_2, .func = w_cpu},

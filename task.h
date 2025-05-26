@@ -11,9 +11,9 @@ struct task
 {
     union
     {
-        op_cpu_matrix_multiplication_args_t cpu_args;
-        op_disk_word_counting_args_t disk_args;
-        op_network_send_args_t net_args;
+        op_cpu_args_t cpu_args;
+        op_disk_args_t disk_args;
+        op_network_args_t net_args;
     } args;
     struct work_struct work;
     struct list_head list;
