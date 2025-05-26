@@ -73,5 +73,3 @@ void ww_loop(struct work_struct *work);
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);
 void w_disk(struct work_struct *work);
-struct client_work *create_task(struct task t, enum task_type type, int total_next_workqueue,
-                                struct next_workqueue next_works[]);
