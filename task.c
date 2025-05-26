@@ -51,6 +51,12 @@ void w_net(struct work_struct *work)
     if (atomic_sub_and_test(1, &c_task->watchdog->works_left))
         queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
     // pr_info("%s: network done\n", THIS_MODULE->name);
+    for (int i = 0; i < c_task->total_next_workqueue; i++)
+    {
+        struct next_workqueue *next_wq = &c_task->next_works[i];
+        INIT_WORK(&next_wq->cw->work, next_wq->func);
+        queue_work(next_wq->wq, &next_wq->cw->work);
+    }
 }
 
 void w_disk(struct work_struct *work)
