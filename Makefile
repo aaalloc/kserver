@@ -1,7 +1,7 @@
 KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
-ccflags-y += -Wall -g
+ccflags-y += -Wall -g -O3
 
 TARGET = kserver
 
@@ -23,3 +23,7 @@ bear:
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
+
+
+stresstest: stresstest.c
+	gcc -Wall -g -O3 -o stresstest stresstest.c -lpthread
