@@ -1,7 +1,7 @@
 #include "task.h"
 #include "ksocket_handler.h"
 #include <linux/module.h>
-void ww_loop(struct work_struct *work)
+void ww_call(struct work_struct *work)
 {
     struct work_watchdog *ww = container_of(work, struct work_watchdog, work);
     ksocket_write((struct ksocket_handler){

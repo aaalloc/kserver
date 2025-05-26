@@ -68,7 +68,7 @@ static struct list_head lwork_watchdog = LIST_HEAD_INIT(lwork_watchdog);
 void free_client_work_list(void);
 void free_work_watchdog_list(void);
 
-void ww_loop(struct work_struct *work);
+void ww_call(struct work_struct *work);
 
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);
