@@ -29,7 +29,7 @@ void w_cpu(struct work_struct *work)
     op_cpu_matrix_multiplication_free(&c_task->t.args.cpu_args);
     // pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
 
-    if (atomic_sub_and_test(1, &c_task->watchdog->works_left))
+    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
         queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
 
     for (int i = 0; i < c_task->total_next_workqueue; i++)
@@ -51,7 +51,7 @@ void w_net(struct work_struct *work)
         return;
     }
 
-    if (atomic_sub_and_test(1, &c_task->watchdog->works_left))
+    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
         queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
     // pr_info("%s: network done\n", THIS_MODULE->name);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
@@ -73,7 +73,7 @@ void w_disk(struct work_struct *work)
         return;
     }
 
-    if (atomic_sub_and_test(1, &c_task->watchdog->works_left))
+    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
         queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
 
     // pr_info("%s: Disk operation finished, read: %d\n", THIS_MODULE->name, ret);

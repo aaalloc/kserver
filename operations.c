@@ -262,26 +262,17 @@ ssize_t op_disk_write(op_disk_args_t *args)
 
 int op_network_send(op_network_args_t *args)
 {
-    int size_payload = args->args.send.size_payload;
-    struct socket *sock = args->sock;
-    int iterations = args->args.send.iterations;
-
-    uint16_t *buf = kmalloc(size_payload, GFP_KERNEL);
-    if (!buf)
-        return -1;
-    memset(buf, 'A', size_payload);
-
-    for (int i = 0; i < iterations; i++)
+    int ret = 0;
+    for (int i = 0; i < args->args.send.iterations; i++)
     {
-        if (ksocket_write((struct ksocket_handler){
-                .sock = sock,
-                .buf = buf,
-                .len = size_payload,
-            }) < 0)
-            goto clean;
+        ret = ksocket_write((struct ksocket_handler){
+            .sock = args->sock,
+            .buf = args->args.send.payload,
+            .len = args->args.send.size_payload,
+        });
+        if (ret < 0)
+            break;
     }
 
-clean:
-    kfree(buf);
-    return 0;
+    return ret;
 }

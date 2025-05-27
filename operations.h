@@ -43,6 +43,7 @@ typedef struct
     {
         struct
         {
+            void *payload;
             int size_payload;
             int iterations;
         } send;
