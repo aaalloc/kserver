@@ -13,4 +13,4 @@ int mom_publish_init(char *addresses_str);
  */
 int mom_publish_start(struct socket *s);
 
-void mom_publish_free_wq(void);
+void mom_publish_free(void);

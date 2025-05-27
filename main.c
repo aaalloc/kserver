@@ -36,6 +36,10 @@ module_param(listen_addresses, charp, 0644);
 MODULE_PARM_DESC(listen_addresses,
                  "Comma-separated list of IP:port addresses to listen on (e.g., '192.168.1.1:8080,127.0.0.1:9090')");
 
+static int kserver_port = 12345;
+module_param(kserver_port, int, 0644);
+MODULE_PARM_DESC(kserver_port, "Port number for the kernel server (default: 12345)");
+
 static struct workqueue_struct *kserver_wq_clients_read;
 
 static struct task_struct *kserver_thread;
@@ -157,7 +161,7 @@ static int __init kserver_init(void)
         return -ENOMEM;
     }
 
-    int res = open_lsocket(&listen_sock, 12345);
+    int res = open_lsocket(&listen_sock, kserver_port);
     if (res < 0)
     {
         pr_err("%s: Failed to open socket: %d\n", THIS_MODULE->name, res);
@@ -215,7 +219,7 @@ static void __exit kserver_exit(void)
         destroy_workqueue(kserver_wq_clients_read);
     }
 
-    mom_publish_free_wq();
+    mom_publish_free();
     free_client_list();
     free_client_work_list();
     free_work_watchdog_list();

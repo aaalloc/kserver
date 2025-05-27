@@ -361,3 +361,15 @@ void mom_publish_free_wq(void)
         destroy_workqueue(mom_work_watchdog);
     }
 }
+
+void mom_publish_free(void)
+{
+    // Free all listen sockets
+    for (int i = 0; i < num_listen_sockets; i++)
+    {
+        if (listen_sockets[i].sock)
+            close_lsocket(listen_sockets[i].sock);
+    }
+
+    mom_publish_free_wq();
+}
