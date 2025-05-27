@@ -42,14 +42,13 @@ int ksocket_read(struct ksocket_handler handler)
 int ksocket_write(struct ksocket_handler handler)
 {
     struct socket *sock = handler.sock;
-    uint16_t *buf = handler.buf;
     int len = handler.len;
 
     struct msghdr msg = {0};
     struct kvec vec;
     int ret;
 
-    vec.iov_base = buf;
+    vec.iov_base = handler.buf;
     vec.iov_len = len;
 
     ret = kernel_sendmsg(sock, &msg, &vec, 1, len);

@@ -164,22 +164,14 @@ void *send_request(void *arg)
             fprintf(stderr, "Receive failed: %s\n", strerror(errno));
             continue;
         }
-        else if (bytes_received == 0)
+        if ((bytes_received == 2 && buffer[0] == 0x1337) || buffer[(bytes_received / 2) - 1] == END_FLAG)
         {
-            printf("Server closed connection\n");
-            break; // Server closed connection
+            clock_gettime(CLOCK_MONOTONIC, &end_time);
+            response_times[valid_responses] = get_time_diff(start_time, end_time);
+            valid_responses++;
+            continue; // Valid response received
         }
-        else if (bytes_received == 1)
-        {
-            if (buffer[0] == END_FLAG)
-            {
-                clock_gettime(CLOCK_MONOTONIC, &end_time);
-                response_times[valid_responses] = get_time_diff(start_time, end_time);
-                valid_responses++;
-                continue; // Valid response received
-            }
-        }
-        printf("Buffer: %s\n", (char *)buffer);
+
         goto receive; // Continue receiving until we get END_FLAG
     }
 

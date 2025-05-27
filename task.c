@@ -1,13 +1,15 @@
 #include "task.h"
 #include "ksocket_handler.h"
 #include <linux/module.h>
+
 void ww_call(struct work_struct *work)
 {
     struct work_watchdog *ww = container_of(work, struct work_watchdog, work);
+    uint16_t buf[1] = {0x1337};
     ksocket_write((struct ksocket_handler){
         .sock = ww->sock,
-        .buf = (uint16_t[]){0x1337},
-        .len = 1,
+        .buf = buf,
+        .len = sizeof(buf),
     });
     // pr_info("%s: Work watchdog finished\n", THIS_MODULE->name);
 }

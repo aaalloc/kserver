@@ -4,7 +4,7 @@
 struct ksocket_handler
 {
     struct socket *sock;
-    uint16_t *buf;
+    void *buf;
     int len;
 };
 
