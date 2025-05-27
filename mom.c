@@ -23,8 +23,8 @@
 struct workqueue_struct *mom_first_step;
 struct workqueue_struct *mom_second_step_cpu;
 struct workqueue_struct *mom_second_step_disk;
-struct workqueue_struct *mom_third_step;
-struct workqueue_struct *mom_work_watchdog;
+struct workqueue_struct *mom_third_step_net_notify_sub;
+struct workqueue_struct *mom_third_step_net_ack;
 
 #define MAX_LISTEN_SOCKETS 10
 typedef struct _listen_addr
@@ -150,7 +150,10 @@ int mom_publish_init(char *addresses_str)
             .t =
                 {
                     .sock = sock,
-                    .args.net_args = {.sock = sock, .args.send = {.size_payload = 10, .iterations = 1}},
+                    .args.net_args = {.sock = sock,
+                                      .args.send = {.payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                                                    .size_payload = 26,
+                                                    .iterations = 1}},
                 },
             .total_next_workqueue = 0,
             .next_works = {},
@@ -178,15 +181,15 @@ int mom_publish_init(char *addresses_str)
         return -ENOMEM;
     }
 
-    mom_third_step = alloc_workqueue("mom_third_step", WQ_UNBOUND, 0);
-    if (!mom_third_step)
+    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND, 0);
+    if (!mom_third_step_net_notify_sub)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_work_watchdog = alloc_workqueue("mom_work_watchdog", WQ_UNBOUND, 0);
-    if (!mom_work_watchdog)
+    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND, 0);
+    if (!mom_third_step_net_ack)
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
@@ -198,17 +201,18 @@ int mom_publish_init(char *addresses_str)
 // Start will be (N)_CPU
 int mom_publish_start(struct socket *s)
 {
-    // struct client_work *cw_net_3 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
-    // if (!cw_net_3)
-    // {
-    //     pr_err("%s: Failed to allocate memory for cw_net_3\n", THIS_MODULE->name);
-    //     return -ENOMEM;
-    // }
+    struct client_work *cw_net_3_ack = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    if (!cw_net_3_ack)
+    {
+        pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
+        return -ENOMEM;
+    }
+
     struct client_work *cw_cpu_2 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_cpu_2)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
-        // kfree(cw_net_3);
+        kfree(cw_net_3_ack);
         return -ENOMEM;
     }
 
@@ -216,7 +220,7 @@ int mom_publish_start(struct socket *s)
     if (!cw_disk_2)
     {
         pr_err("%s: Failed to allocate memory for cw_disk_2\n", THIS_MODULE->name);
-        // kfree(cw_net_3);
+        kfree(cw_net_3_ack);
         kfree(cw_cpu_2);
         return -ENOMEM;
     }
@@ -225,52 +229,18 @@ int mom_publish_start(struct socket *s)
     if (!cw_cpu_1)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_1\n", THIS_MODULE->name);
-        // kfree(cw_net_3);
+        kfree(cw_net_3_ack);
         kfree(cw_cpu_2);
         kfree(cw_disk_2);
         return -ENOMEM;
     }
-
-    struct work_watchdog *ww = kmalloc(sizeof(struct work_watchdog), GFP_KERNEL);
-    if (!ww)
-    {
-        pr_err("%s: Failed to allocate memory for work_watchdog\n", THIS_MODULE->name);
-        // kfree(cw_net_3);
-        kfree(cw_cpu_2);
-        kfree(cw_disk_2);
-        kfree(cw_cpu_1);
-        return -ENOMEM;
-    }
-    ww->wq = mom_work_watchdog;
-    INIT_WORK(&ww->work, ww_call);
 
     list_add(&cw_cpu_1->list, &lclients_works);
     list_add(&cw_cpu_2->list, &lclients_works);
     list_add(&cw_disk_2->list, &lclients_works);
-    // list_add(&cw_net_3->list, &lclients_works);
-
-    ww->works_left = (atomic_t){.counter = 4};
-
-    // ww->arg = (struct ksocket_handler){.sock = s, .buf = (unsigned char[]){0x022}, .len = 1};
-    // ww->func = (void (*)(void *))ksocket_write;
-    ww->sock = s;
-
-    init_waitqueue_head(&ww->wait_any_work_done);
-
-    // *cw_net_3 = (struct client_work){
-    //     .watchdog = ww,
-    //     .t =
-    //         {
-    //             .sock = s,
-    //             .args.net_args = {.sock = s, .args.send = {.size_payload = 10, .iterations = 1}},
-    //         },
-    //     .total_next_workqueue = 0,
-    //     .next_works = {},
-    // };
-    // INIT_WORK(&cw_net_3->work, w_net);
+    list_add(&cw_net_3_ack->list, &lclients_works);
 
     *cw_cpu_2 = (struct client_work){
-        .watchdog = ww,
         .t =
             {
                 .sock = s,
@@ -280,21 +250,32 @@ int mom_publish_start(struct socket *s)
                     },
             },
         .total_next_workqueue = num_listen_sockets,
-        // .next_works = {{.wq = mom_third_step, .cw = cw_net_3, .func = w_net}},
     };
     for (int i = 0; i < num_listen_sockets; i++)
     {
-        cw_nets[i].watchdog = ww;
-        cw_cpu_2->next_works[i].wq = mom_third_step;
+        cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
         cw_cpu_2->next_works[i].cw = &cw_nets[i];
         cw_cpu_2->next_works[i].func = w_net;
-        // ww->works_left.counter++;
+        // no need to add to the list, it is allocated on the stack not the heap
     }
+    *cw_net_3_ack = (struct client_work){
+        .t =
+            {
+                .sock = s,
+                .args.net_args = {.sock = s, .args.send = {.payload = "PUBACK", .size_payload = 6, .iterations = 1}},
+            },
+        .total_next_workqueue = 0,
+        .next_works = {},
+    };
+    // for having the notify sub and ack executed in parallel
+    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].wq = mom_third_step_net_ack;
+    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].cw = cw_net_3_ack;
+    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].func = w_net;
+    cw_cpu_2->total_next_workqueue++;
 
     // INIT_WORK(&cw_cpu_2->work, w_cpu);
 
     *cw_disk_2 = (struct client_work){
-        .watchdog = ww,
         .t =
             {
                 .sock = s,
@@ -302,7 +283,7 @@ int mom_publish_start(struct socket *s)
                                    // TODO: for write, I think random value is better
                                    .args.write = {.to_write = "hello_world_something",
                                                   .len_to_write = 22,
-                                                  .iterations = 1000000 * 10}},
+                                                  .iterations = 100000}},
             },
         .total_next_workqueue = 0,
         .next_works = {},
@@ -310,7 +291,6 @@ int mom_publish_start(struct socket *s)
     // INIT_WORK(&cw_disk_2->work, w_disk);
 
     *cw_cpu_1 = (struct client_work){
-        .watchdog = ww,
         .t =
             {
                 .sock = s,
@@ -349,16 +329,16 @@ void mom_publish_free_wq(void)
         destroy_workqueue(mom_second_step_disk);
     }
 
-    if (mom_third_step)
+    if (mom_third_step_net_notify_sub)
     {
-        flush_workqueue(mom_third_step);
-        destroy_workqueue(mom_third_step);
+        flush_workqueue(mom_third_step_net_notify_sub);
+        destroy_workqueue(mom_third_step_net_notify_sub);
     }
 
-    if (mom_work_watchdog)
+    if (mom_third_step_net_ack)
     {
-        flush_workqueue(mom_work_watchdog);
-        destroy_workqueue(mom_work_watchdog);
+        flush_workqueue(mom_third_step_net_ack);
+        destroy_workqueue(mom_third_step_net_ack);
     }
 }
 

@@ -16,7 +16,10 @@
 #define DEFAULT_NUM_REQUESTS 1000
 #define DEFAULT_NUM_THREADS 50
 #define BUFFER_SIZE 1024
-#define END_FLAG 0x1337 // Magic number to indicate end of response
+#define END_FLAG "PUBACK"
+#define CHECK_END_FLAG(buf, len)                                                                                       \
+    (len == 6 && (buf[0] == END_FLAG[0]) && (buf[1] == END_FLAG[1]) && (buf[2] == END_FLAG[2]) &&                      \
+     (buf[3] == END_FLAG[3]) && (buf[4] == END_FLAG[4]) && (buf[5] == END_FLAG[5]))
 
 // Structure pour les arguments du programme
 struct arguments_t
@@ -147,7 +150,7 @@ void *send_request(void *arg)
     for (int i = 0; i < data->requests_per_thread; i++)
     {
         struct timespec start_time, end_time;
-        uint16_t buffer[BUFFER_SIZE];
+        unsigned char buffer[BUFFER_SIZE];
 
         clock_gettime(CLOCK_MONOTONIC, &start_time);
 
@@ -164,11 +167,12 @@ void *send_request(void *arg)
             fprintf(stderr, "Receive failed: %s\n", strerror(errno));
             continue;
         }
-        if ((bytes_received == 2 && buffer[0] == END_FLAG) || buffer[(bytes_received / 2) - 1] == END_FLAG)
+        if (CHECK_END_FLAG(buffer, bytes_received))
         {
             clock_gettime(CLOCK_MONOTONIC, &end_time);
             response_times[valid_responses] = get_time_diff(start_time, end_time);
             valid_responses++;
+            printf("received END_FLAG\n");
             continue; // Valid response received
         }
 

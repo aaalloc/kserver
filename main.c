@@ -88,7 +88,7 @@ static void client_handler(struct work_struct *work)
         }
 
         mom_publish_start(cl->sock);
-        pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
+        // pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
 clean:
@@ -222,7 +222,6 @@ static void __exit kserver_exit(void)
     mom_publish_free();
     free_client_list();
     free_client_work_list();
-    free_work_watchdog_list();
 
     pr_info("%s: bye bye\n", THIS_MODULE->name);
 }
