@@ -26,8 +26,137 @@ struct workqueue_struct *mom_second_step_disk;
 struct workqueue_struct *mom_third_step;
 struct workqueue_struct *mom_work_watchdog;
 
-int mom_publish_init(void)
+#define MAX_LISTEN_SOCKETS 10
+typedef struct _listen_addr
 {
+    char ip[16]; // IPv4 address string
+    int port;
+    struct socket *sock;
+} listen_addr;
+
+static listen_addr listen_sockets[MAX_LISTEN_SOCKETS];
+struct client_work cw_nets[MAX_LISTEN_SOCKETS];
+static int num_listen_sockets = 0;
+
+static int parse_address(const char *addr_str, listen_addr *addr)
+{
+    char *colon_pos;
+    int ip_len;
+
+    if (!addr_str || !addr)
+    {
+        return -EINVAL;
+    }
+
+    colon_pos = strchr(addr_str, ':');
+    if (!colon_pos)
+    {
+        pr_err("%s: Invalid address format: %s (expected IP:PORT)\n", THIS_MODULE->name, addr_str);
+        return -EINVAL;
+    }
+
+    ip_len = colon_pos - addr_str;
+    if (ip_len >= sizeof(addr->ip))
+    {
+        pr_err("%s: IP address too long: %s\n", THIS_MODULE->name, addr_str);
+        return -EINVAL;
+    }
+
+    strncpy(addr->ip, addr_str, ip_len);
+    addr->ip[ip_len] = '\0';
+
+    if (kstrtoint(colon_pos + 1, 10, &addr->port) < 0)
+    {
+        pr_err("%s: Invalid port number: %s\n", THIS_MODULE->name, colon_pos + 1);
+        return -EINVAL;
+    }
+
+    if (addr->port <= 0 || addr->port > 65535)
+    {
+        pr_err("%s: Port number out of range: %d\n", THIS_MODULE->name, addr->port);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+// Function to parse the comma-separated list of addresses
+static int parse_listen_addresses(const char *addresses_str)
+{
+    char *addresses_copy, *token, *ptr;
+    int count = 0;
+
+    if (!addresses_str)
+    {
+        return -EINVAL;
+    }
+
+    addresses_copy = kstrdup(addresses_str, GFP_KERNEL);
+    if (!addresses_copy)
+    {
+        return -ENOMEM;
+    }
+
+    ptr = addresses_copy;
+    while ((token = strsep(&ptr, ",")) && count < MAX_LISTEN_SOCKETS)
+    {
+        // Remove leading/trailing whitespace
+        while (*token == ' ' || *token == '\t')
+            token++;
+
+        if (parse_address(token, &listen_sockets[count]) == 0)
+        {
+            pr_info("%s: Parsed address %d: %s:%d\n", THIS_MODULE->name, count, listen_sockets[count].ip,
+                    listen_sockets[count].port);
+            count++;
+        }
+    }
+
+    kfree(addresses_copy);
+    num_listen_sockets = count;
+
+    if (count == 0)
+    {
+        pr_err("%s: No valid addresses parsed\n", THIS_MODULE->name);
+        return -EINVAL;
+    }
+
+    pr_info("%s: Parsed %d listen addresses\n", THIS_MODULE->name, count);
+    return 0;
+}
+
+int mom_publish_init(char *addresses_str)
+{
+    // addresses_str represent the client addresses when a mom publish
+    // is done, it will send a publish to all of them
+    int ret = parse_listen_addresses(addresses_str);
+    if (ret < 0)
+    {
+        pr_err("%s: Failed to parse listen addresses: %d\n", THIS_MODULE->name, ret);
+        return ret;
+    }
+    for (int i = 0; i < num_listen_sockets; i++)
+    {
+        struct socket *sock;
+        ret = connect_lsocket_addr(&sock, listen_sockets[i].ip, listen_sockets[i].port);
+        if (ret < 0)
+        {
+            pr_err("%s: Failed to open socket for %s:%d: %d\n", THIS_MODULE->name, listen_sockets[i].ip,
+                   listen_sockets[i].port, ret);
+            return ret;
+        }
+        listen_sockets[i].sock = sock;
+        cw_nets[i] = (struct client_work){
+            .t =
+                {
+                    .sock = sock,
+                    .args.net_args = {.sock = sock, .args.send = {.size_payload = 10, .iterations = 1}},
+                },
+            .total_next_workqueue = 0,
+            .next_works = {},
+        };
+    }
+
     mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND, 0);
     if (!mom_first_step)
     {
@@ -69,17 +198,17 @@ int mom_publish_init(void)
 // Start will be (N)_CPU
 int mom_publish_start(struct socket *s)
 {
-    struct client_work *cw_net_3 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
-    if (!cw_net_3)
-    {
-        pr_err("%s: Failed to allocate memory for cw_net_3\n", THIS_MODULE->name);
-        return -ENOMEM;
-    }
+    // struct client_work *cw_net_3 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    // if (!cw_net_3)
+    // {
+    //     pr_err("%s: Failed to allocate memory for cw_net_3\n", THIS_MODULE->name);
+    //     return -ENOMEM;
+    // }
     struct client_work *cw_cpu_2 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_cpu_2)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
-        kfree(cw_net_3);
+        // kfree(cw_net_3);
         return -ENOMEM;
     }
 
@@ -87,7 +216,7 @@ int mom_publish_start(struct socket *s)
     if (!cw_disk_2)
     {
         pr_err("%s: Failed to allocate memory for cw_disk_2\n", THIS_MODULE->name);
-        kfree(cw_net_3);
+        // kfree(cw_net_3);
         kfree(cw_cpu_2);
         return -ENOMEM;
     }
@@ -96,7 +225,7 @@ int mom_publish_start(struct socket *s)
     if (!cw_cpu_1)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_1\n", THIS_MODULE->name);
-        kfree(cw_net_3);
+        // kfree(cw_net_3);
         kfree(cw_cpu_2);
         kfree(cw_disk_2);
         return -ENOMEM;
@@ -106,7 +235,7 @@ int mom_publish_start(struct socket *s)
     if (!ww)
     {
         pr_err("%s: Failed to allocate memory for work_watchdog\n", THIS_MODULE->name);
-        kfree(cw_net_3);
+        // kfree(cw_net_3);
         kfree(cw_cpu_2);
         kfree(cw_disk_2);
         kfree(cw_cpu_1);
@@ -118,7 +247,7 @@ int mom_publish_start(struct socket *s)
     list_add(&cw_cpu_1->list, &lclients_works);
     list_add(&cw_cpu_2->list, &lclients_works);
     list_add(&cw_disk_2->list, &lclients_works);
-    list_add(&cw_net_3->list, &lclients_works);
+    // list_add(&cw_net_3->list, &lclients_works);
 
     ww->works_left = (atomic_t){.counter = 4};
 
@@ -128,16 +257,16 @@ int mom_publish_start(struct socket *s)
 
     init_waitqueue_head(&ww->wait_any_work_done);
 
-    *cw_net_3 = (struct client_work){
-        .watchdog = ww,
-        .t =
-            {
-                .sock = s,
-                .args.net_args = {.sock = s, .args.send = {.size_payload = 10, .iterations = 1}},
-            },
-        .total_next_workqueue = 0,
-        .next_works = {},
-    };
+    // *cw_net_3 = (struct client_work){
+    //     .watchdog = ww,
+    //     .t =
+    //         {
+    //             .sock = s,
+    //             .args.net_args = {.sock = s, .args.send = {.size_payload = 10, .iterations = 1}},
+    //         },
+    //     .total_next_workqueue = 0,
+    //     .next_works = {},
+    // };
     // INIT_WORK(&cw_net_3->work, w_net);
 
     *cw_cpu_2 = (struct client_work){
@@ -150,9 +279,18 @@ int mom_publish_start(struct socket *s)
                         .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
-        .total_next_workqueue = 1,
-        .next_works = {{.wq = mom_third_step, .cw = cw_net_3, .func = w_net}},
+        .total_next_workqueue = num_listen_sockets,
+        // .next_works = {{.wq = mom_third_step, .cw = cw_net_3, .func = w_net}},
     };
+    for (int i = 0; i < num_listen_sockets; i++)
+    {
+        cw_nets[i].watchdog = ww;
+        cw_cpu_2->next_works[i].wq = mom_third_step;
+        cw_cpu_2->next_works[i].cw = &cw_nets[i];
+        cw_cpu_2->next_works[i].func = w_net;
+        // ww->works_left.counter++;
+    }
+
     // INIT_WORK(&cw_cpu_2->work, w_cpu);
 
     *cw_disk_2 = (struct client_work){

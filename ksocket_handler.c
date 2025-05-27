@@ -134,3 +134,125 @@ int close_lsocket(struct socket *sock)
     }
     return 0;
 }
+
+int open_lsocket_addr(struct socket **result, const char *ip, int port)
+{
+    struct socket *sock;
+    struct sockaddr_in addr;
+    int error;
+    int opt = 1;
+    sockptr_t kopt = {.kernel = (char *)&opt, .is_kernel = 1};
+
+    struct net *net = current->nsproxy->net_ns;
+
+    // IPv4, TCP
+    error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
+    if (error < 0)
+    {
+        pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);
+        return error;
+    }
+
+    error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
+
+    error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    // Convert IP string to binary form
+    if (strcmp(ip, "0.0.0.0") == 0)
+    {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+    else
+    {
+        error = in4_pton(ip, -1, (u8 *)&addr.sin_addr.s_addr, -1, NULL);
+        if (error == 0)
+        {
+            pr_err("%s: Invalid IP address: %s\n", THIS_MODULE->name, ip);
+            error = -EINVAL;
+            goto err_bind;
+        }
+    }
+
+    error = kernel_bind(sock, (struct sockaddr *)&addr, sizeof(addr));
+    if (error < 0)
+    {
+        // show info from sockaddr
+        pr_err("%s: kernel_bind failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
+        goto err_bind;
+    }
+
+    error = kernel_listen(sock, 128);
+    if (error < 0)
+    {
+        pr_err("%s: kernel_listen failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
+        goto err_bind;
+    }
+
+    pr_info("%s: binding to %s:%d\n", THIS_MODULE->name, ip, port);
+    *result = sock;
+    return 0;
+err_bind:
+    kernel_sock_shutdown(sock, SHUT_RDWR);
+err_setsockopt:
+    sock_release(sock);
+    return error;
+}
+
+int connect_lsocket_addr(struct socket **result, const char *ip, int port)
+{
+    struct socket *sock;
+    struct sockaddr_in addr;
+    int error;
+
+    struct net *net = current->nsproxy->net_ns;
+
+    // IPv4, TCP
+    error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
+    if (error < 0)
+    {
+        pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);
+        return error;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+
+    // Convert IP string to binary form
+    error = in4_pton(ip, -1, (u8 *)&addr.sin_addr.s_addr, -1, NULL);
+    if (error == 0)
+    {
+        pr_err("%s: Invalid IP address: %s\n", THIS_MODULE->name, ip);
+        error = -EINVAL;
+        goto err_connect;
+    }
+
+    error = kernel_connect(sock, (struct sockaddr *)&addr, sizeof(addr), 0);
+    if (error < 0)
+    {
+        pr_err("%s: kernel_connect failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
+        goto err_connect;
+    }
+
+    pr_info("%s: connected to %s:%d\n", THIS_MODULE->name, ip, port);
+    *result = sock;
+    return 0;
+
+err_connect:
+    sock_release(sock);
+    return error;
+}

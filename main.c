@@ -27,6 +27,14 @@ MODULE_AUTHOR("yanovskyy");
 MODULE_LICENSE("GPL");
 
 #define BUF_SIZE 4096
+#define MAX_LISTEN_SOCKETS 10
+#define MAX_ADDR_STR_LEN 256
+
+// Module parameters
+static char *listen_addresses = "0.0.0.0:12345";
+module_param(listen_addresses, charp, 0644);
+MODULE_PARM_DESC(listen_addresses,
+                 "Comma-separated list of IP:port addresses to listen on (e.g., '192.168.1.1:8080,127.0.0.1:9090')");
 
 static struct workqueue_struct *kserver_wq_clients_read;
 
@@ -143,7 +151,7 @@ static int __init kserver_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
 
-    if (mom_publish_init() < 0)
+    if (mom_publish_init(listen_addresses) < 0)
     {
         pr_err("%s: Failed to initialize MOM publish\n", THIS_MODULE->name);
         return -ENOMEM;

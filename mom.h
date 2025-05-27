@@ -6,7 +6,7 @@
  * mom_publish_init - Initialize internal workqueues for the MOM
  * @return 0 on success, negative error code on failure.
  */
-int mom_publish_init(void);
+int mom_publish_init(char *addresses_str);
 /*
  * mom_publish_start - Start the MOM publish process
  * @s: socket to use for the publish process
