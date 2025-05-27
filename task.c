@@ -98,7 +98,7 @@ void free_client_work_list(void)
 void free_work_watchdog_list(void)
 {
     struct work_watchdog *ww, *tmp;
-    list_for_each_entry_safe(ww, tmp, &lwork_watchdog, list)
+    list_for_each_entry_safe(ww, tmp, &lwork_watchdogs, list)
     {
         list_del(&ww->list);
         kfree(ww);

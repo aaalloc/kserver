@@ -53,7 +53,6 @@ struct work_watchdog
     struct work_struct work;
     struct workqueue_struct *wq;
     atomic_t works_left;
-    wait_queue_head_t wait_any_work_done;
     // TODO: arg need to be generic
     // struct ksocket_handler arg;
     // void (*func)(void *);
@@ -63,7 +62,7 @@ struct work_watchdog
 };
 
 static struct list_head lclients_works = LIST_HEAD_INIT(lclients_works);
-static struct list_head lwork_watchdog = LIST_HEAD_INIT(lwork_watchdog);
+static struct list_head lwork_watchdogs = LIST_HEAD_INIT(lwork_watchdogs);
 
 void free_client_work_list(void);
 void free_work_watchdog_list(void);
