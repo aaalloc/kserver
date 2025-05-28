@@ -20,8 +20,6 @@
 int ksocket_read(struct ksocket_handler handler)
 {
     struct socket *sock = handler.sock;
-    uint16_t *buf = handler.buf;
-    int len = handler.len;
 
     struct msghdr msg = {0};
     struct kvec vec;
@@ -30,10 +28,10 @@ int ksocket_read(struct ksocket_handler handler)
     // don't know if its worth it do that, user has just to use wisely the len
     // memset(buf, 0, len);
 
-    vec.iov_base = buf;
-    vec.iov_len = len;
+    vec.iov_base = handler.buf;
+    vec.iov_len = handler.len;
 
-    ret = kernel_recvmsg(sock, &msg, &vec, 1, len, msg.msg_flags);
+    ret = kernel_recvmsg(sock, &msg, &vec, 1, handler.len, msg.msg_flags);
     if (ret < 0)
         pr_err("%s: kernel_recvmsg failed: %d\n", THIS_MODULE->name, ret);
     return ret;

@@ -58,7 +58,7 @@ static void client_handler(struct work_struct *work)
 {
     client *cl = container_of(work, client, client_context);
 
-    uint16_t *buf;
+    void *buf;
     buf = kmalloc(BUF_SIZE, GFP_KERNEL);
     if (!buf)
     {
@@ -66,6 +66,7 @@ static void client_handler(struct work_struct *work)
         goto clean;
     }
 
+    uint32_t len_recv = 0;
     // TODO: this is in a case where workqueue should be created with flag
     // WQ_UNBOUND, one workaround is put back self to the workqueue
     // after ksocket_read has been done
@@ -73,8 +74,23 @@ static void client_handler(struct work_struct *work)
     {
         int ret = ksocket_read((struct ksocket_handler){
             .sock = cl->sock,
+            .buf = &len_recv,
+            .len = sizeof(len_recv),
+        });
+        if (ret < 0)
+        {
+            pr_err("%s: ksocket_read failed: %d\n", THIS_MODULE->name, ret);
+            goto clean;
+        }
+        if (ret == 0)
+        {
+            // pr_info("%s: Connection closed by peer\n", THIS_MODULE->name);
+            goto clean;
+        }
+        ret = ksocket_read((struct ksocket_handler){
+            .sock = cl->sock,
             .buf = buf,
-            .len = BUF_SIZE,
+            .len = len_recv,
         });
         if (ret < 0)
         {
