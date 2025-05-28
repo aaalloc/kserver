@@ -89,6 +89,13 @@ int open_lsocket(struct socket **result, int port)
         goto err_setsockopt;
     }
 
+    error = sock_setsockopt(sock, SOL_TCP, TCP_NODELAY, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
+
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
@@ -161,6 +168,13 @@ int open_lsocket_addr(struct socket **result, const char *ip, int port)
     }
 
     error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
+    if (error < 0)
+    {
+        pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
+        goto err_setsockopt;
+    }
+
+    error = sock_setsockopt(sock, SOL_TCP, TCP_NODELAY, kopt, sizeof(opt));
     if (error < 0)
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);

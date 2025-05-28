@@ -6,19 +6,21 @@
 // ┌────┐
 // │READ│
 // └┬───┘
-// ┌▽───────┐
-// │(N)_CPU │
-// └┬──────┬┘
-// ┌▽────┐┌▽─────┐
-// │CPU  ││DISK  │
-// └┬────┘└──────┘
-// ┌▽─────────────┐
-// │(NCLIENTS)_NET│
-// └──────────────┘
+// ┌▽──────────────────────────┐
+// │(N)_CPU                    │
+// └┬─────────────────────────┬┘
+// ┌▽───────────────────────┐┌▽───┐
+// │CPU                     ││DISK│
+// └┬──────────────────────┬┘└────┘
+// ┌▽────────────────────┐┌▽───────────────────────────┐
+// │(NCLIENTS)_NET_NOTIFY││(NCLIENTS)_NET_PUBACK_CLIENT│
+// └─────────────────────┘└────────────────────────────┘
 // READ: done in client_handler() (step 0)
 // N_CPU: CPU task that will be repeated N times (step 1)
 // CPU & DISK: CPU & DISK tasks executed in parallel (step 2)
-// NCLIENTS_NET: network tasks that will be executed in parallel (step 4)
+// (NCLIENTS)_NET_NOTIFY: network tasks that will be executed in parallel for notifying subscriber on topic (step 3)
+// (NCLIENTS)_NET_PUBACK_CLIENT: network task that will be executed in parallel send PUBACK to client to "pub" on topic
+// (step 3)
 
 struct workqueue_struct *mom_first_step;
 struct workqueue_struct *mom_second_step_cpu;
@@ -286,7 +288,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
                                    // TODO: for write, I think random value is better
                                    .args.write = {.to_write = "hello_world_something",
                                                   .len_to_write = 22,
-                                                  .iterations = 100000}},
+                                                  .iterations = 10000}},
             },
         .total_next_workqueue = 0,
         .next_works = {},
