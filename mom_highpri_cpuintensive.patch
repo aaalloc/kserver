@@ -1,0 +1,45 @@
+diff --git a/mom.c b/mom.c
+index bd21467..083026e 100644
+--- a/mom.c
++++ b/mom.c
+@@ -162,35 +162,35 @@ int mom_publish_init(char *addresses_str)
+         };
+     }
+ 
+-    mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND, 0);
++    mom_first_step = alloc_workqueue("mom_first_step", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+     if (!mom_first_step)
+     {
+         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+         return -ENOMEM;
+     }
+ 
+-    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_UNBOUND, 0);
++    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+     if (!mom_second_step_cpu)
+     {
+         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+         return -ENOMEM;
+     }
+ 
+-    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_UNBOUND, 0);
++    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+     if (!mom_second_step_disk)
+     {
+         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+         return -ENOMEM;
+     }
+ 
+-    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND, 0);
++    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+     if (!mom_third_step_net_notify_sub)
+     {
+         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
+         return -ENOMEM;
+     }
+ 
+-    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND, 0);
++    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 0);
+     if (!mom_third_step_net_ack)
+     {
+         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
