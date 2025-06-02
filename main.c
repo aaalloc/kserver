@@ -53,6 +53,8 @@ typedef struct _client
 struct socket *listen_sock;
 
 LIST_HEAD(lclients);
+LIST_HEAD(lclients_works);
+DEFINE_SPINLOCK(lclients_works_lock);
 
 static void client_handler(struct work_struct *work)
 {
@@ -204,7 +206,6 @@ static int __init kserver_init(void)
 
         return PTR_ERR(kserver_thread);
     }
-
     return 0;
 }
 
@@ -217,6 +218,16 @@ static void free_client_list(void)
         kernel_sock_shutdown(cl->sock, SHUT_RDWR);
         sock_release(cl->sock);
         kfree(cl);
+    }
+}
+
+static void free_client_work_list(void)
+{
+    struct client_work *cw, *tmp;
+    list_for_each_entry_safe(cw, tmp, &lclients_works, list)
+    {
+        list_del(&cw->list);
+        kfree(cw);
     }
 }
 

@@ -203,14 +203,14 @@ int mom_publish_init(char *addresses_str)
 // Start will be (N)_CPU
 int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len)
 {
-    struct client_work *cw_net_3_ack = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    struct client_work *cw_net_3_ack = kzalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_net_3_ack)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    struct client_work *cw_cpu_2 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    struct client_work *cw_cpu_2 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_cpu_2)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
@@ -218,7 +218,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         return -ENOMEM;
     }
 
-    struct client_work *cw_disk_2 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    struct client_work *cw_disk_2 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_disk_2)
     {
         pr_err("%s: Failed to allocate memory for cw_disk_2\n", THIS_MODULE->name);
@@ -227,7 +227,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         return -ENOMEM;
     }
 
-    struct client_work *cw_cpu_1 = kmalloc(sizeof(struct client_work), GFP_KERNEL);
+    struct client_work *cw_cpu_1 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_cpu_1)
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_1\n", THIS_MODULE->name);
@@ -237,30 +237,24 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         return -ENOMEM;
     }
 
-    // TODO: check if list_add need to have spinlock or is used in it
-    list_add(&cw_cpu_1->list, &lclients_works);
-    list_add(&cw_cpu_2->list, &lclients_works);
-    list_add(&cw_disk_2->list, &lclients_works);
-    list_add(&cw_net_3_ack->list, &lclients_works);
-
     *cw_cpu_2 = (struct client_work){
         .t =
             {
                 .sock = s,
                 .args.cpu_args.args =
                     {
-                        .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
-        .total_next_workqueue = num_listen_sockets,
+        // .total_next_workqueue = num_listen_sockets,
     };
-    for (int i = 0; i < num_listen_sockets; i++)
-    {
-        cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
-        cw_cpu_2->next_works[i].cw = &cw_nets[i];
-        cw_cpu_2->next_works[i].func = w_net;
-        // no need to add to the list, it is allocated on the stack not the heap
-    }
+    // for (int i = 0; i < num_listen_sockets; i++)
+    // {
+    //     cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
+    //     cw_cpu_2->next_works[i].cw = &cw_nets[i];
+    //     cw_cpu_2->next_works[i].func = w_net;
+    //     // no need to add to the list, it is allocated on the stack not the heap
+    // }
     *cw_net_3_ack = (struct client_work){
         .t =
             {
@@ -302,7 +296,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
                 .sock = s,
                 .args.cpu_args.args =
                     {
-                        .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
+                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
         .total_next_workqueue = 2,
@@ -310,6 +304,13 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
                        {.wq = mom_second_step_disk, .cw = cw_disk_2, .func = w_disk}},
     };
     INIT_WORK(&cw_cpu_1->work, w_cpu);
+
+    spin_lock(&lclients_works_lock);
+    list_add_rcu(&cw_cpu_1->list, &lclients_works);
+    list_add_rcu(&cw_cpu_2->list, &lclients_works);
+    list_add_rcu(&cw_disk_2->list, &lclients_works);
+    list_add_rcu(&cw_net_3_ack->list, &lclients_works);
+    spin_unlock(&lclients_works_lock);
 
     queue_work(mom_first_step, &cw_cpu_1->work);
     return 0;

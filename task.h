@@ -4,6 +4,7 @@
 #include <asm/atomic.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
 #define MAX_PARALLEL_TASKS 10
@@ -46,9 +47,9 @@ struct client_work
     struct next_workqueue next_works[MAX_PARALLEL_TASKS];
 };
 
-static struct list_head lclients_works = LIST_HEAD_INIT(lclients_works);
-
-void free_client_work_list(void);
+extern spinlock_t lclients_works_lock;
+extern struct list_head lclients_works;
+// void free_client_work_list(void);
 
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);
