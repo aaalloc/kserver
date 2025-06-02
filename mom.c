@@ -237,6 +237,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         return -ENOMEM;
     }
 
+    // TODO: check if list_add need to have spinlock or is used in it
     list_add(&cw_cpu_1->list, &lclients_works);
     list_add(&cw_cpu_2->list, &lclients_works);
     list_add(&cw_disk_2->list, &lclients_works);

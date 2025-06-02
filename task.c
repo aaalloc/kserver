@@ -2,18 +2,6 @@
 #include "ksocket_handler.h"
 #include <linux/module.h>
 
-void ww_call(struct work_struct *work)
-{
-    struct work_watchdog *ww = container_of(work, struct work_watchdog, work);
-    uint16_t buf[1] = {0x1337};
-    ksocket_write((struct ksocket_handler){
-        .sock = ww->sock,
-        .buf = buf,
-        .len = sizeof(buf),
-    });
-    // pr_info("%s: Work watchdog finished\n", THIS_MODULE->name);
-}
-
 void w_cpu(struct work_struct *work)
 {
     struct client_work *c_task = container_of(work, struct client_work, work);
@@ -28,9 +16,6 @@ void w_cpu(struct work_struct *work)
     op_cpu_matrix_multiplication(&c_task->t.args.cpu_args);
     op_cpu_matrix_multiplication_free(&c_task->t.args.cpu_args);
     // pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
-
-    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
-        queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
 
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
@@ -51,8 +36,6 @@ void w_net(struct work_struct *work)
         return;
     }
 
-    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
-        queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
     // pr_info("%s: network done\n", THIS_MODULE->name);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
@@ -73,9 +56,6 @@ void w_disk(struct work_struct *work)
         return;
     }
 
-    if (c_task->watchdog != NULL && atomic_sub_and_test(1, &c_task->watchdog->works_left))
-        queue_work(c_task->watchdog->wq, &c_task->watchdog->work);
-
     // pr_info("%s: Disk operation finished, read: %d\n", THIS_MODULE->name, ret);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
@@ -92,15 +72,5 @@ void free_client_work_list(void)
     {
         list_del(&cw->list);
         kfree(cw);
-    }
-}
-
-void free_work_watchdog_list(void)
-{
-    struct work_watchdog *ww, *tmp;
-    list_for_each_entry_safe(ww, tmp, &lwork_watchdogs, list)
-    {
-        list_del(&ww->list);
-        kfree(ww);
     }
 }

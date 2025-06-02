@@ -28,7 +28,6 @@ enum task_type
 };
 
 struct client_work;
-struct work_watchdog;
 struct next_workqueue
 {
     struct workqueue_struct *wq;
@@ -41,33 +40,15 @@ struct client_work
     struct list_head list;
     struct work_struct work;
     struct task t;
-    struct work_watchdog *watchdog;
     size_t total_next_workqueue;
     // TODO: Actually, here we should use a struct list_head, but for simplicity sake now it is more duable to use an
     // array
     struct next_workqueue next_works[MAX_PARALLEL_TASKS];
 };
 
-struct work_watchdog
-{
-    struct work_struct work;
-    struct workqueue_struct *wq;
-    atomic_t works_left;
-    // TODO: arg need to be generic
-    // struct ksocket_handler arg;
-    // void (*func)(void *);
-    // void *func;
-    struct socket *sock;
-    struct list_head list;
-};
-
 static struct list_head lclients_works = LIST_HEAD_INIT(lclients_works);
-static struct list_head lwork_watchdogs = LIST_HEAD_INIT(lwork_watchdogs);
 
 void free_client_work_list(void);
-void free_work_watchdog_list(void);
-
-void ww_call(struct work_struct *work);
 
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);
