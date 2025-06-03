@@ -47,6 +47,14 @@ typedef struct
             int size_payload;
             int iterations;
         } send;
+        struct
+        {
+            char *ip;
+            int port;
+            void *payload;
+            int size_payload;
+            int iterations;
+        } conn_send;
     } args;
 } op_network_args_t;
 
@@ -59,3 +67,4 @@ ssize_t op_disk_read(op_disk_args_t *args);
 ssize_t op_disk_write(op_disk_args_t *args);
 
 int op_network_send(op_network_args_t *args);
+int op_network_conn_send(op_network_args_t *args);

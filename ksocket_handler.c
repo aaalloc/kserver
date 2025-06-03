@@ -260,7 +260,7 @@ int connect_lsocket_addr(struct socket **result, const char *ip, int port)
         goto err_connect;
     }
 
-    pr_info("%s: connected to %s:%d\n", THIS_MODULE->name, ip, port);
+    // pr_info("%s: connected to %s:%d\n", THIS_MODULE->name, ip, port);
     *result = sock;
     return 0;
 

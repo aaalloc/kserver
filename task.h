@@ -18,7 +18,6 @@ struct task
     } args;
     struct work_struct work;
     struct list_head list;
-    struct socket *sock;
 };
 
 enum task_type
@@ -53,4 +52,5 @@ extern struct list_head lclients_works;
 
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);
+void w_conn_net(struct work_struct *work);
 void w_disk(struct work_struct *work);

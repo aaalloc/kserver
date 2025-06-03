@@ -139,23 +139,24 @@ int mom_publish_init(char *addresses_str)
     }
     for (int i = 0; i < num_listen_sockets; i++)
     {
-        struct socket *sock;
-        ret = connect_lsocket_addr(&sock, listen_sockets[i].ip, listen_sockets[i].port);
-        if (ret < 0)
-        {
-            pr_err("%s: Failed to open socket for %s:%d: %d\n", THIS_MODULE->name, listen_sockets[i].ip,
-                   listen_sockets[i].port, ret);
-            return ret;
-        }
-        listen_sockets[i].sock = sock;
+        // struct socket *sock;
+        // ret = connect_lsocket_addr(&sock, listen_sockets[i].ip, listen_sockets[i].port);
+        // if (ret < 0)
+        // {
+        //     pr_err("%s: Failed to open socket for %s:%d: %d\n", THIS_MODULE->name, listen_sockets[i].ip,
+        //            listen_sockets[i].port, ret);
+        //     return ret;
+        // }
+        // listen_sockets[i].sock = sock;
         cw_nets[i] = (struct client_work){
             .t =
                 {
-                    .sock = sock,
-                    .args.net_args = {.sock = sock,
-                                      .args.send = {.payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-                                                    .size_payload = 26,
-                                                    .iterations = 1}},
+                    .args.net_args = {.sock = NULL,
+                                      .args.conn_send = {.ip = listen_sockets[i].ip,
+                                                         .port = listen_sockets[i].port,
+                                                         .payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                                                         .size_payload = 26,
+                                                         .iterations = 1}},
                 },
             .total_next_workqueue = 0,
             .next_works = {},
@@ -240,25 +241,24 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
     *cw_cpu_2 = (struct client_work){
         .t =
             {
-                .sock = s,
                 .args.cpu_args.args =
                     {
                         .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
-        // .total_next_workqueue = num_listen_sockets,
+        .total_next_workqueue = num_listen_sockets,
     };
-    // for (int i = 0; i < num_listen_sockets; i++)
-    // {
-    //     cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
-    //     cw_cpu_2->next_works[i].cw = &cw_nets[i];
-    //     cw_cpu_2->next_works[i].func = w_net;
-    //     // no need to add to the list, it is allocated on the stack not the heap
-    // }
+    for (int i = 0; i < num_listen_sockets; i++)
+    {
+        cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
+        cw_cpu_2->next_works[i].cw = &cw_nets[i];
+        cw_cpu_2->next_works[i].func = w_conn_net;
+        // no need to add to the list, it is allocated on the stack not the heap
+    }
+
     *cw_net_3_ack = (struct client_work){
         .t =
             {
-                .sock = s,
                 .args.net_args = {.sock = s,
                                   .args.send = {.payload = ack_flag_msg,
                                                 .size_payload = ack_flag_msg_len,
@@ -267,33 +267,30 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         .total_next_workqueue = 0,
         .next_works = {},
     };
-    // for having the notify sub and ack executed in parallel
-    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].wq = mom_third_step_net_ack;
-    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].cw = cw_net_3_ack;
-    cw_cpu_2->next_works[cw_cpu_2->total_next_workqueue].func = w_net;
-    cw_cpu_2->total_next_workqueue++;
 
     // INIT_WORK(&cw_cpu_2->work, w_cpu);
 
     *cw_disk_2 = (struct client_work){
         .t =
             {
-                .sock = s,
                 .args.disk_args = {.filename = "/tmp/mom_disk_write.txt",
                                    // TODO: for write, I think random value is better
                                    .args.write = {.to_write = "hello_world_something",
                                                   .len_to_write = 22,
                                                   .iterations = 10000}},
             },
-        .total_next_workqueue = 0,
-        .next_works = {},
+        .total_next_workqueue = 1,
+        .next_works = {{
+            .wq = mom_third_step_net_ack,
+            .cw = cw_net_3_ack,
+            .func = w_net,
+        }},
     };
     // INIT_WORK(&cw_disk_2->work, w_disk);
 
     *cw_cpu_1 = (struct client_work){
         .t =
             {
-                .sock = s,
                 .args.cpu_args.args =
                     {
                         .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
@@ -306,10 +303,10 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
     INIT_WORK(&cw_cpu_1->work, w_cpu);
 
     spin_lock(&lclients_works_lock);
-    list_add_rcu(&cw_cpu_1->list, &lclients_works);
-    list_add_rcu(&cw_cpu_2->list, &lclients_works);
-    list_add_rcu(&cw_disk_2->list, &lclients_works);
-    list_add_rcu(&cw_net_3_ack->list, &lclients_works);
+    list_add(&cw_cpu_1->list, &lclients_works);
+    list_add(&cw_cpu_2->list, &lclients_works);
+    list_add(&cw_disk_2->list, &lclients_works);
+    list_add(&cw_net_3_ack->list, &lclients_works);
     spin_unlock(&lclients_works_lock);
 
     queue_work(mom_first_step, &cw_cpu_1->work);
@@ -352,11 +349,11 @@ void mom_publish_free_wq(void)
 void mom_publish_free(void)
 {
     // Free all listen sockets
-    for (int i = 0; i < num_listen_sockets; i++)
-    {
-        if (listen_sockets[i].sock)
-            close_lsocket(listen_sockets[i].sock);
-    }
+    // for (int i = 0; i < num_listen_sockets; i++)
+    // {
+    //     if (listen_sockets[i].sock)
+    //         close_lsocket(listen_sockets[i].sock);
+    // }
 
     mom_publish_free_wq();
 }

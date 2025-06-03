@@ -106,7 +106,7 @@ static void client_handler(struct work_struct *work)
         }
 
         mom_publish_start(cl->sock, MOM_PUBLISH_ACK_FLAG, MOM_PUBLISH_ACK_FLAG_LEN);
-        pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
+        // pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
 clean:

@@ -276,3 +276,35 @@ int op_network_send(op_network_args_t *args)
 
     return ret;
 }
+
+int op_network_conn_send(op_network_args_t *args)
+{
+    int ret = 0;
+    struct socket *sock;
+    ret = connect_lsocket_addr(&sock, args->args.conn_send.ip, args->args.conn_send.port);
+    if (ret < 0)
+    {
+        pr_err("Failed to open socket for %s:%d: %d\n", args->args.conn_send.ip, args->args.conn_send.port, ret);
+        return ret;
+    }
+
+    for (int i = 0; i < args->args.conn_send.iterations; i++)
+    {
+        ret = ksocket_write((struct ksocket_handler){
+            .sock = sock,
+            .buf = args->args.conn_send.payload,
+            .len = args->args.conn_send.size_payload,
+        });
+        if (ret < 0)
+            break;
+    }
+
+    ret = close_lsocket(sock);
+    if (ret < 0)
+    {
+        pr_err("Failed to close socket for %s:%d: %d\n", args->args.conn_send.ip, args->args.conn_send.port, ret);
+        return ret;
+    }
+
+    return ret;
+}
