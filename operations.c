@@ -265,11 +265,15 @@ int op_network_send(op_network_args_t *args)
     int ret = 0;
     for (int i = 0; i < args->args.send.iterations; i++)
     {
+        if (args->lock)
+            spin_lock(args->lock);
         ret = ksocket_write((struct ksocket_handler){
             .sock = args->sock,
             .buf = args->args.send.payload,
             .len = args->args.send.size_payload,
         });
+        if (args->lock)
+            spin_unlock(args->lock);
         if (ret < 0)
             break;
     }

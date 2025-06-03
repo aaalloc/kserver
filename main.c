@@ -67,6 +67,7 @@ static void client_handler(struct work_struct *work)
         pr_err("%s: Failed to allocate memory for buffer\n", THIS_MODULE->name);
         goto clean;
     }
+    spinlock_t sp = __SPIN_LOCK_UNLOCKED(sp);
 
     uint32_t len_recv = 0;
     // TODO: this is in a case where workqueue should be created with flag
@@ -105,7 +106,7 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        mom_publish_start(cl->sock, MOM_PUBLISH_ACK_FLAG, MOM_PUBLISH_ACK_FLAG_LEN);
+        mom_publish_start(cl->sock, &sp, MOM_PUBLISH_ACK_FLAG, MOM_PUBLISH_ACK_FLAG_LEN);
         // pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 

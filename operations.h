@@ -1,4 +1,5 @@
 #pragma once
+#include <linux/spinlock.h>
 #include <linux/types.h>
 typedef struct
 {
@@ -39,6 +40,7 @@ typedef struct
 typedef struct
 {
     struct socket *sock;
+    spinlock_t *lock; // Optional, for thread safety
     union
     {
         struct

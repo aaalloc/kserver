@@ -152,6 +152,7 @@ int mom_publish_init(char *addresses_str)
             .t =
                 {
                     .args.net_args = {.sock = NULL,
+                                      .lock = NULL,
                                       .args.conn_send = {.ip = listen_sockets[i].ip,
                                                          .port = listen_sockets[i].port,
                                                          .payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -202,7 +203,7 @@ int mom_publish_init(char *addresses_str)
 }
 
 // Start will be (N)_CPU
-int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len)
+int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int ack_flag_msg_len)
 {
     struct client_work *cw_net_3_ack = kzalloc(sizeof(struct client_work), GFP_KERNEL);
     if (!cw_net_3_ack)
@@ -260,6 +261,7 @@ int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len
         .t =
             {
                 .args.net_args = {.sock = s,
+                                  .lock = sp,
                                   .args.send = {.payload = ack_flag_msg,
                                                 .size_payload = ack_flag_msg_len,
                                                 .iterations = 1}},

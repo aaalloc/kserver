@@ -14,6 +14,6 @@ int mom_publish_init(char *addresses_str);
  * mom_publish_start - Start the MOM publish process
  * @s: socket to use for the publish process
  */
-int mom_publish_start(struct socket *s, char *ack_flag_msg, int ack_flag_msg_len);
+int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int ack_flag_msg_len);
 
 void mom_publish_free(void);
