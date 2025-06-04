@@ -32,7 +32,7 @@ int ksocket_read(struct ksocket_handler handler)
     vec.iov_len = handler.len;
 
     ret = kernel_recvmsg(sock, &msg, &vec, 1, handler.len, msg.msg_flags);
-    if (ret < 0)
+    if (unlikely(ret < 0))
         pr_err("%s: kernel_recvmsg failed: %d\n", THIS_MODULE->name, ret);
     return ret;
 }
@@ -50,7 +50,7 @@ int ksocket_write(struct ksocket_handler handler)
     vec.iov_len = len;
 
     ret = kernel_sendmsg(sock, &msg, &vec, 1, len);
-    if (ret < 0)
+    if (unlikely(ret < 0))
         pr_err("%s: kernel_sendmsg failed: %d\n", THIS_MODULE->name, ret);
     return ret;
 }
@@ -67,28 +67,28 @@ int open_lsocket(struct socket **result, int port)
 
     // IPv4, TCP
     error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);
         return error;
     }
 
     error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
     }
 
     error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
     }
 
     error = sock_setsockopt(sock, SOL_TCP, TCP_NODELAY, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
@@ -101,14 +101,14 @@ int open_lsocket(struct socket **result, int port)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     error = kernel_bind(sock, (struct sockaddr *)&addr, sizeof(addr));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_bind failed: %d\n", THIS_MODULE->name, error);
         goto err_bind;
     }
 
     error = kernel_listen(sock, 128);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_listen failed: %d\n", THIS_MODULE->name, error);
         goto err_bind;
@@ -130,7 +130,7 @@ int close_lsocket(struct socket *sock)
     if (sock)
     {
         res = kernel_sock_shutdown(sock, SHUT_RDWR);
-        if (res < 0)
+        if (unlikely(res < 0))
         {
             pr_err("%s: kernel_sock_shutdown failed: %d\n", THIS_MODULE->name, res);
             return res;
@@ -152,28 +152,28 @@ int open_lsocket_addr(struct socket **result, const char *ip, int port)
 
     // IPv4, TCP
     error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);
         return error;
     }
 
     error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
     }
 
     error = sock_setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
     }
 
     error = sock_setsockopt(sock, SOL_TCP, TCP_NODELAY, kopt, sizeof(opt));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_setsockopt failed: %d\n", THIS_MODULE->name, error);
         goto err_setsockopt;
@@ -191,7 +191,7 @@ int open_lsocket_addr(struct socket **result, const char *ip, int port)
     else
     {
         error = in4_pton(ip, -1, (u8 *)&addr.sin_addr.s_addr, -1, NULL);
-        if (error == 0)
+        if (unlikely(error == 0))
         {
             pr_err("%s: Invalid IP address: %s\n", THIS_MODULE->name, ip);
             error = -EINVAL;
@@ -200,7 +200,7 @@ int open_lsocket_addr(struct socket **result, const char *ip, int port)
     }
 
     error = kernel_bind(sock, (struct sockaddr *)&addr, sizeof(addr));
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         // show info from sockaddr
         pr_err("%s: kernel_bind failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
@@ -208,7 +208,7 @@ int open_lsocket_addr(struct socket **result, const char *ip, int port)
     }
 
     error = kernel_listen(sock, 128);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_listen failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
         goto err_bind;
@@ -234,7 +234,7 @@ int connect_lsocket_addr(struct socket **result, const char *ip, int port)
 
     // IPv4, TCP
     error = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: socket_create failed: %d\n", THIS_MODULE->name, error);
         return error;
@@ -246,7 +246,7 @@ int connect_lsocket_addr(struct socket **result, const char *ip, int port)
 
     // Convert IP string to binary form
     error = in4_pton(ip, -1, (u8 *)&addr.sin_addr.s_addr, -1, NULL);
-    if (error == 0)
+    if (unlikely(error == 0))
     {
         pr_err("%s: Invalid IP address: %s\n", THIS_MODULE->name, ip);
         error = -EINVAL;
@@ -254,7 +254,7 @@ int connect_lsocket_addr(struct socket **result, const char *ip, int port)
     }
 
     error = kernel_connect(sock, (struct sockaddr *)&addr, sizeof(addr), 0);
-    if (error < 0)
+    if (unlikely(error < 0))
     {
         pr_err("%s: kernel_connect failed for %s:%d: %d\n", THIS_MODULE->name, ip, port, error);
         goto err_connect;

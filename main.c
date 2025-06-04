@@ -62,7 +62,7 @@ static void client_handler(struct work_struct *work)
 
     void *buf;
     buf = kmalloc(BUF_SIZE, GFP_KERNEL);
-    if (!buf)
+    if (unlikely(!buf))
     {
         pr_err("%s: Failed to allocate memory for buffer\n", THIS_MODULE->name);
         goto clean;
@@ -123,7 +123,7 @@ clean:
 static inline struct work_struct *create_client(struct socket *sock)
 {
     client *cl = kmalloc(sizeof(client), GFP_KERNEL);
-    if (!cl)
+    if (unlikely(!cl))
     {
         pr_err("%s: Failed to allocate memory for client\n", THIS_MODULE->name);
         return NULL;
@@ -148,14 +148,14 @@ static int kserver_daemon(void *data)
     while (!kthread_should_stop())
     {
         int error = kernel_accept(listen_sock, &sock, 0);
-        if (error < 0)
+        if (unlikely(error < 0))
         {
             pr_err("%s: kernel_accept failed: %d\n", THIS_MODULE->name, error);
             continue;
         }
 
         client_read_work = create_client(sock);
-        if (!client_read_work)
+        if (unlikely(!client_read_work))
         {
             pr_err("%s: Failed to create client work\n", THIS_MODULE->name);
             kernel_sock_shutdown(sock, SHUT_RDWR);
@@ -174,14 +174,17 @@ static int __init kserver_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
 
-    if (mom_publish_init(listen_addresses) < 0)
+    int res = 0;
+    res = mom_publish_init(listen_addresses);
+
+    if (unlikely(res < 0))
     {
         pr_err("%s: Failed to initialize MOM publish\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    int res = open_lsocket(&listen_sock, kserver_port);
-    if (res < 0)
+    res = open_lsocket(&listen_sock, kserver_port);
+    if (unlikely(res < 0))
     {
         pr_err("%s: Failed to open socket: %d\n", THIS_MODULE->name, res);
         return res;
@@ -191,18 +194,18 @@ static int __init kserver_init(void)
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
     kserver_wq_clients_read = alloc_workqueue("wq_clients_read", WQ_UNBOUND, 0);
-    if (!kserver_wq_clients_read)
+    if (unlikely(!kserver_wq_clients_read))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     kserver_thread = kthread_run(kserver_daemon, NULL, THIS_MODULE->name);
-    if (IS_ERR(kserver_thread))
+    if (unlikely(IS_ERR(kserver_thread)))
     {
         pr_err("%s: Failed to create kernel thread\n", THIS_MODULE->name);
         res = close_lsocket(listen_sock);
-        if (res < 0)
+        if (unlikely(res < 0))
             pr_err("%s: Failed to close socket: %d\n", THIS_MODULE->name, res);
 
         return PTR_ERR(kserver_thread);

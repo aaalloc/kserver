@@ -45,20 +45,21 @@ static int parse_address(const char *addr_str, listen_addr *addr)
     char *colon_pos;
     int ip_len;
 
-    if (!addr_str || !addr)
+    if (unlikely(!addr_str || !addr))
     {
+        pr_err("%s: Invalid address or address structure is NULL\n", THIS_MODULE->name);
         return -EINVAL;
     }
 
     colon_pos = strchr(addr_str, ':');
-    if (!colon_pos)
+    if (unlikely(!colon_pos))
     {
         pr_err("%s: Invalid address format: %s (expected IP:PORT)\n", THIS_MODULE->name, addr_str);
         return -EINVAL;
     }
 
     ip_len = colon_pos - addr_str;
-    if (ip_len >= sizeof(addr->ip))
+    if (unlikely(ip_len >= sizeof(addr->ip)))
     {
         pr_err("%s: IP address too long: %s\n", THIS_MODULE->name, addr_str);
         return -EINVAL;
@@ -67,13 +68,13 @@ static int parse_address(const char *addr_str, listen_addr *addr)
     strncpy(addr->ip, addr_str, ip_len);
     addr->ip[ip_len] = '\0';
 
-    if (kstrtoint(colon_pos + 1, 10, &addr->port) < 0)
+    if (unlikely(kstrtoint(colon_pos + 1, 10, &addr->port) < 0))
     {
         pr_err("%s: Invalid port number: %s\n", THIS_MODULE->name, colon_pos + 1);
         return -EINVAL;
     }
 
-    if (addr->port <= 0 || addr->port > 65535)
+    if (unlikely(addr->port < 0 || addr->port > 65535))
     {
         pr_err("%s: Port number out of range: %d\n", THIS_MODULE->name, addr->port);
         return -EINVAL;
@@ -90,14 +91,16 @@ static int parse_listen_addresses(const char *addresses_str)
     char *addresses_copy, *token, *ptr;
     int count = 0;
 
-    if (!addresses_str)
+    if (unlikely(!addresses_str))
     {
+        pr_err("%s: No addresses provided for parsing\n", THIS_MODULE->name);
         return -EINVAL;
     }
 
     addresses_copy = kstrdup(addresses_str, GFP_KERNEL);
-    if (!addresses_copy)
+    if (unlikely(!addresses_copy))
     {
+        pr_err("%s: Failed to allocate memory for addresses copy\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
@@ -119,7 +122,7 @@ static int parse_listen_addresses(const char *addresses_str)
     kfree(addresses_copy);
     num_connect_sockets = count;
 
-    if (count == 0)
+    if (unlikely(count == 0))
     {
         pr_err("%s: No valid addresses parsed\n", THIS_MODULE->name);
         return -EINVAL;
@@ -134,42 +137,42 @@ int mom_publish_init(char *addresses_str)
     // addresses_str represent the client addresses when a mom publish
     // is done, it will send a publish to all of them
     int ret = parse_listen_addresses(addresses_str);
-    if (ret < 0)
+    if (unlikely(ret < 0))
     {
         pr_err("%s: Failed to parse listen addresses: %d\n", THIS_MODULE->name, ret);
         return ret;
     }
 
     mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND, 0);
-    if (!mom_first_step)
+    if (unlikely(!mom_first_step))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_UNBOUND, 0);
-    if (!mom_second_step_cpu)
+    if (unlikely(!mom_second_step_cpu))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_UNBOUND, 0);
-    if (!mom_second_step_disk)
+    if (unlikely(!mom_second_step_disk))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND, 0);
-    if (!mom_third_step_net_notify_sub)
+    if (unlikely(!mom_third_step_net_notify_sub))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND, 0);
-    if (!mom_third_step_net_ack)
+    if (unlikely(!mom_third_step_net_ack))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
@@ -182,14 +185,14 @@ int mom_publish_init(char *addresses_str)
 int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int ack_flag_msg_len)
 {
     struct client_work *cw_net_3_ack = kzalloc(sizeof(struct client_work), GFP_KERNEL);
-    if (!cw_net_3_ack)
+    if (unlikely(!cw_net_3_ack))
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
     struct client_work *cw_cpu_2 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
-    if (!cw_cpu_2)
+    if (unlikely(!cw_cpu_2))
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_2\n", THIS_MODULE->name);
         kfree(cw_net_3_ack);
@@ -197,7 +200,7 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
     }
 
     struct client_work *cw_disk_2 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
-    if (!cw_disk_2)
+    if (unlikely(!cw_disk_2))
     {
         pr_err("%s: Failed to allocate memory for cw_disk_2\n", THIS_MODULE->name);
         kfree(cw_net_3_ack);
@@ -206,7 +209,7 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
     }
 
     struct client_work *cw_cpu_1 = kzalloc(sizeof(struct client_work), GFP_KERNEL);
-    if (!cw_cpu_1)
+    if (unlikely(!cw_cpu_1))
     {
         pr_err("%s: Failed to allocate memory for cw_cpu_1\n", THIS_MODULE->name);
         kfree(cw_net_3_ack);
@@ -243,7 +246,7 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
     for (int i = 0; i < num_connect_sockets; i++)
     {
         struct client_work *cw_net_3_notify = kzalloc(sizeof(struct client_work), GFP_KERNEL);
-        if (!cw_net_3_notify)
+        if (unlikely(!cw_net_3_notify))
         {
             pr_err("%s: Failed to allocate memory for cw_net_3_notify\n", THIS_MODULE->name);
             kfree(cw_net_3_ack);

@@ -114,7 +114,7 @@ void op_cpu_matrix_multiplication(op_cpu_args_t *args)
 void read_file(char *filename)
 {
     struct file *file = filp_open(filename, O_RDONLY, 0);
-    if (IS_ERR(file))
+    if (unlikely(IS_ERR(file)))
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(file));
         return;
@@ -151,7 +151,7 @@ int op_disk_word_counting(op_disk_args_t *args)
     }
 
     unsigned char *buf = kzalloc(4096, GFP_KERNEL);
-    if (!buf)
+    if (unlikely(!buf))
     {
         pr_err("Failed to allocate memory for buffer\n");
         filp_close(file, NULL);
@@ -162,7 +162,7 @@ int op_disk_word_counting(op_disk_args_t *args)
     while (1)
     {
         ssize_t ret = kernel_read(file, buf, sizeof(buf), &file->f_pos);
-        if (ret < 0)
+        if (unlikely(ret < 0))
         {
             pr_err("Failed to read file: %ld\n", ret);
             break;
@@ -198,7 +198,7 @@ ssize_t op_disk_read(op_disk_args_t *args)
     }
 
     unsigned char *buf = kmalloc(BUFFER_SIZE, GFP_KERNEL);
-    if (!buf)
+    if (unlikely(!buf))
     {
         pr_err("Failed to allocate memory for buffer\n");
         filp_close(file, NULL);
@@ -236,7 +236,7 @@ ssize_t op_disk_write(op_disk_args_t *args)
     int iterations = args->args.write.iterations;
 
     struct file *file = filp_open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (IS_ERR(file))
+    if (unlikely(IS_ERR(file)))
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(file));
         return -1;
@@ -286,7 +286,7 @@ int op_network_conn_send(op_network_args_t *args)
     int ret = 0;
     struct socket *sock;
     ret = connect_lsocket_addr(&sock, args->args.conn_send.ip, args->args.conn_send.port);
-    if (ret < 0)
+    if (unlikely(ret < 0))
     {
         pr_err("Failed to open socket for %s:%d: %d\n", args->args.conn_send.ip, args->args.conn_send.port, ret);
         return ret;
@@ -304,7 +304,7 @@ int op_network_conn_send(op_network_args_t *args)
     }
 
     ret = close_lsocket(sock);
-    if (ret < 0)
+    if (unlikely(ret < 0))
     {
         pr_err("Failed to close socket for %s:%d: %d\n", args->args.conn_send.ip, args->args.conn_send.port, ret);
         return ret;
