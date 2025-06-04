@@ -28,7 +28,6 @@ struct workqueue_struct *mom_second_step_disk;
 struct workqueue_struct *mom_third_step_net_notify_sub;
 struct workqueue_struct *mom_third_step_net_ack;
 
-#define MAX_LISTEN_SOCKETS 10
 typedef struct _listen_addr
 {
     char ip[16]; // IPv4 address string
@@ -36,9 +35,10 @@ typedef struct _listen_addr
     struct socket *sock;
 } listen_addr;
 
+#define MAX_LISTEN_SOCKETS 10
+
 static listen_addr listen_sockets[MAX_LISTEN_SOCKETS];
-struct client_work cw_nets[MAX_LISTEN_SOCKETS];
-static int num_listen_sockets = 0;
+static int num_connect_sockets = 0;
 
 static int parse_address(const char *addr_str, listen_addr *addr)
 {
@@ -83,6 +83,8 @@ static int parse_address(const char *addr_str, listen_addr *addr)
 }
 
 // Function to parse the comma-separated list of addresses
+// WARNING: Update num_connect_sockets global variable
+// listen_sockets global variable will be update also
 static int parse_listen_addresses(const char *addresses_str)
 {
     char *addresses_copy, *token, *ptr;
@@ -115,7 +117,7 @@ static int parse_listen_addresses(const char *addresses_str)
     }
 
     kfree(addresses_copy);
-    num_listen_sockets = count;
+    num_connect_sockets = count;
 
     if (count == 0)
     {
@@ -136,32 +138,6 @@ int mom_publish_init(char *addresses_str)
     {
         pr_err("%s: Failed to parse listen addresses: %d\n", THIS_MODULE->name, ret);
         return ret;
-    }
-    for (int i = 0; i < num_listen_sockets; i++)
-    {
-        // struct socket *sock;
-        // ret = connect_lsocket_addr(&sock, listen_sockets[i].ip, listen_sockets[i].port);
-        // if (ret < 0)
-        // {
-        //     pr_err("%s: Failed to open socket for %s:%d: %d\n", THIS_MODULE->name, listen_sockets[i].ip,
-        //            listen_sockets[i].port, ret);
-        //     return ret;
-        // }
-        // listen_sockets[i].sock = sock;
-        cw_nets[i] = (struct client_work){
-            .t =
-                {
-                    .args.net_args = {.sock = NULL,
-                                      .lock = NULL,
-                                      .args.conn_send = {.ip = listen_sockets[i].ip,
-                                                         .port = listen_sockets[i].port,
-                                                         .payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-                                                         .size_payload = 26,
-                                                         .iterations = 1}},
-                },
-            .total_next_workqueue = 0,
-            .next_works = {},
-        };
     }
 
     mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND, 0);
@@ -239,24 +215,6 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
         return -ENOMEM;
     }
 
-    *cw_cpu_2 = (struct client_work){
-        .t =
-            {
-                .args.cpu_args.args =
-                    {
-                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
-                    },
-            },
-        .total_next_workqueue = num_listen_sockets,
-    };
-    for (int i = 0; i < num_listen_sockets; i++)
-    {
-        cw_cpu_2->next_works[i].wq = mom_third_step_net_notify_sub;
-        cw_cpu_2->next_works[i].cw = &cw_nets[i];
-        cw_cpu_2->next_works[i].func = w_conn_net;
-        // no need to add to the list, it is allocated on the stack not the heap
-    }
-
     *cw_net_3_ack = (struct client_work){
         .t =
             {
@@ -269,6 +227,53 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
         .total_next_workqueue = 0,
         .next_works = {},
     };
+
+    *cw_cpu_2 = (struct client_work){
+        .t =
+            {
+                .args.cpu_args.args =
+                    {
+                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
+                    },
+            },
+        .total_next_workqueue = num_connect_sockets,
+    };
+
+    struct list_head tmp_cw_net_3_notify = LIST_HEAD_INIT(tmp_cw_net_3_notify);
+    for (int i = 0; i < num_connect_sockets; i++)
+    {
+        struct client_work *cw_net_3_notify = kzalloc(sizeof(struct client_work), GFP_KERNEL);
+        if (!cw_net_3_notify)
+        {
+            pr_err("%s: Failed to allocate memory for cw_net_3_notify\n", THIS_MODULE->name);
+            kfree(cw_net_3_ack);
+            kfree(cw_cpu_2);
+            kfree(cw_disk_2);
+            kfree(cw_cpu_1);
+            return -ENOMEM;
+        }
+
+        *cw_net_3_notify = (struct client_work){
+            .t =
+                {
+                    .args.net_args = {.sock = NULL,
+                                      .lock = NULL,
+                                      .args.conn_send = {.ip = listen_sockets[i].ip,
+                                                         .port = listen_sockets[i].port,
+                                                         .payload = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                                                         .size_payload = 26,
+                                                         .iterations = 1}},
+                },
+            .total_next_workqueue = 0,
+            .next_works = {},
+        };
+        cw_cpu_2->next_works[i] = (struct next_workqueue){
+            .wq = mom_third_step_net_notify_sub,
+            .cw = cw_net_3_notify,
+            .func = w_conn_net,
+        };
+        list_add(&cw_net_3_notify->list, &tmp_cw_net_3_notify);
+    }
 
     // INIT_WORK(&cw_cpu_2->work, w_cpu);
 
@@ -309,6 +314,13 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
     list_add(&cw_cpu_2->list, &lclients_works);
     list_add(&cw_disk_2->list, &lclients_works);
     list_add(&cw_net_3_ack->list, &lclients_works);
+
+    struct client_work *cw_net_3_notify, *tmp;
+    list_for_each_entry_safe(cw_net_3_notify, tmp, &tmp_cw_net_3_notify, list)
+    {
+        list_del(&cw_net_3_notify->list);
+        list_add(&cw_net_3_notify->list, &lclients_works);
+    }
     spin_unlock(&lclients_works_lock);
 
     queue_work(mom_first_step, &cw_cpu_1->work);
@@ -351,7 +363,7 @@ void mom_publish_free_wq(void)
 void mom_publish_free(void)
 {
     // Free all listen sockets
-    // for (int i = 0; i < num_listen_sockets; i++)
+    // for (int i = 0; i < num_connect_sockets; i++)
     // {
     //     if (listen_sockets[i].sock)
     //         close_lsocket(listen_sockets[i].sock);

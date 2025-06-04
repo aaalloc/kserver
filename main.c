@@ -225,11 +225,14 @@ static void free_client_list(void)
 static void free_client_work_list(void)
 {
     struct client_work *cw, *tmp;
+    int counter = 0;
     list_for_each_entry_safe(cw, tmp, &lclients_works, list)
     {
         list_del(&cw->list);
         kfree(cw);
+        counter++;
     }
+    pr_info("%s: Freed %d client works\n", THIS_MODULE->name, counter);
 }
 
 static void __exit kserver_exit(void)
