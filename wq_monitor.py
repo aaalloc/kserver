@@ -239,9 +239,10 @@ def sigint_handler(signr, frame):
     exit_req = True
 
 
+# TODO: TO FIX !!!!
 def scenario_total_workers_per_cpu(iteration: int, filter_cpu: list[int] = None) -> dict[int, dict[str, int]]:
     """
-    For each iteration, returns a dictionnary with CPU as key 
+    For each iteration, returns a dictionnary with CPU as key
     and a dictionary of idle, active, and total workers as values.
 
     Args:
@@ -269,8 +270,6 @@ def scenario_total_workers_per_cpu(iteration: int, filter_cpu: list[int] = None)
     total_active = 0
     for _, pool in idr_for_each(worker_pool_idr):
         pool = drgn.Object(prog, 'struct worker_pool', address=pool)
-        if filter_cpu and pool.cpu.value_() not in filter_cpu:
-            continue
         if pool.cpu >= 0:
             total_workers += pool.nr_workers.value_()
             total_idle += pool.nr_idle.value_()
@@ -313,48 +312,48 @@ def scenario_total_workers_from_workqueue_per_cpu(iteration: int, filter_name: l
                     }
                 }
             }
-        } 
+        }
     """
 
     wq = {}
     wq['iteration'] = iteration
+    for wq_obj in list_for_each_entry('struct workqueue_struct', workqueues.address_of_(), 'list'):
+        wq_name = wq_obj.name.string_().decode()
+        if filter_name and wq_name not in filter_name:
+            continue
+        if wq_name not in wq:
+            wq[wq_name] = {}
+        for pool in list_for_each_entry('struct pool_workqueue', wq_obj.pwqs.address_of_(), 'pwqs_node'):
+            cpu_counter_tmp = {}
+            pool = drgn.Object(prog, 'struct worker_pool',
+                               address=pool.pool.value_())
 
-    for _, pool in idr_for_each(worker_pool_idr):
-        cpu_counter_tmp = {}
-        pool = drgn.Object(prog, 'struct worker_pool', address=pool)
+            for worker in list_for_each_entry('struct worker', pool.workers.address_of_(), 'node'):
+                worker_on_wq = Worker(worker)
+                if worker_on_wq.cpu not in cpu_counter_tmp:
+                    cpu_counter_tmp[worker_on_wq.cpu] = {
+                        'idle': 0,
+                        'active': 0,
+                        'total_workers': 0
+                    }
 
-        for worker in list_for_each_entry('struct worker', pool.workers.address_of_(), 'node'):
-            worker_on_wq = Worker(worker)
-            if filter_name and worker_on_wq.desc not in filter_name:
-                continue
+                cpu_counter_tmp[worker_on_wq.cpu]['total_workers'] += 1
+                cpu_counter_tmp[worker_on_wq.cpu]['active'] += 1 if worker_on_wq.is_running() else 0
+                cpu_counter_tmp[worker_on_wq.cpu]['idle'] += 1 if not worker_on_wq.is_running() else 0
 
-            if worker_on_wq.cpu not in cpu_counter_tmp:
-                cpu_counter_tmp[worker_on_wq.cpu] = {
-                    'idle': 0,
-                    'active': 0,
-                    'total_workers': 0
-                }
+                if 'cpu' not in wq[wq_name]:
+                    wq[wq_name]['cpu'] = {}
 
-            cpu_counter_tmp[worker_on_wq.cpu]['total_workers'] += 1
-            cpu_counter_tmp[worker_on_wq.cpu]['active'] += 1 if worker_on_wq.is_running() else 0
-            cpu_counter_tmp[worker_on_wq.cpu]['idle'] += 1 if not worker_on_wq.is_running() else 0
+                if worker_on_wq.cpu not in wq[wq_name]['cpu']:
+                    wq[wq_name]['cpu'][worker_on_wq.cpu] = {
+                        'idle': 0,
+                        'active': 0,
+                        'total_workers': 0
+                    }
 
-            # if entry is not present in wq, create it
-            if worker_on_wq.desc not in wq:
-                wq[worker_on_wq.desc] = {}
-            if 'cpu' not in wq[worker_on_wq.desc]:
-                wq[worker_on_wq.desc]['cpu'] = {}
-
-            if worker_on_wq.cpu not in wq[worker_on_wq.desc]['cpu']:
-                wq[worker_on_wq.desc]['cpu'][worker_on_wq.cpu] = {
-                    'idle': 0,
-                    'active': 0,
-                    'total_workers': 0
-                }
-
-            wq[worker_on_wq.desc]['cpu'][worker_on_wq.cpu]['idle'] = cpu_counter_tmp[worker_on_wq.cpu]['idle']
-            wq[worker_on_wq.desc]['cpu'][worker_on_wq.cpu]['active'] = cpu_counter_tmp[worker_on_wq.cpu]['active']
-            wq[worker_on_wq.desc]['cpu'][worker_on_wq.cpu]['total_workers'] = cpu_counter_tmp[worker_on_wq.cpu]['total_workers']
+                wq[wq_name]['cpu'][worker_on_wq.cpu]['idle'] = cpu_counter_tmp[worker_on_wq.cpu]['idle']
+                wq[wq_name]['cpu'][worker_on_wq.cpu]['active'] = cpu_counter_tmp[worker_on_wq.cpu]['active']
+                wq[wq_name]['cpu'][worker_on_wq.cpu]['total_workers'] = cpu_counter_tmp[worker_on_wq.cpu]['total_workers']
     return wq
 
 
@@ -379,21 +378,18 @@ def scenario_total_work_items_per_cpu(iteration: int, filter_cpu: list[int] = No
     cpu = {}
     cpu['iteration'] = iteration
 
+    stats = [0] * PWQ_NR_STATS
     for wq in list_for_each_entry('struct workqueue_struct', workqueues.address_of_(), 'list'):
-        stats = [0] * PWQ_NR_STATS
         for pwq in list_for_each_entry('struct pool_workqueue', wq.pwqs.address_of_(), 'pwqs_node'):
             for i in range(PWQ_NR_STATS):
                 stats[i] += int(pwq.stats[i])
             worker_pool = drgn.Object(
                 prog, 'struct worker_pool', address=pwq.pool.value_())
-            if filter_cpu and worker_pool.cpu.value_() not in filter_cpu:
-                continue
-            if worker_pool.cpu >= 0:
-                cpu[worker_pool.cpu.value_()] = {
-                    'started': stats[PWQ_STAT_STARTED],
-                    'completed': stats[PWQ_STAT_COMPLETED],
-                    'current': stats[PWQ_STAT_STARTED] - stats[PWQ_STAT_COMPLETED]
-                }
+            cpu[worker_pool.cpu.value_()] = {
+                'started': stats[PWQ_STAT_STARTED],
+                'completed': stats[PWQ_STAT_COMPLETED],
+                'current': stats[PWQ_STAT_STARTED] - stats[PWQ_STAT_COMPLETED]
+            }
     return cpu
 
 
@@ -410,12 +406,17 @@ class Scenario(Enum):
 if __name__ == "__main__":
     parser = ArgumentParser(
         description='Print workqueue information.')
-    parser.add_argument('workqueue_names', metavar='N', type=str, nargs='+',
-                        help='a name of the workqueue')
+    parser.add_argument('workqueue_names', metavar='WORKQUEUE', nargs='*', default=[],
+                        type=str, action='extend',
+                        help='a name of the workqueue, can be multiple, e.g. "wq1 wq2", if not specified, all workqueues will be printed')
     parser.add_argument('-i', '--interval', metavar='SECS', type=float, default=1,
                         help='Monitoring interval (0 to print once and exit)')
+    parser.add_argument('-m', '--max-iterations', metavar='N', type=int, default=0,
+                        help='Maximum number of iterations (0 for infinite)')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='Print verbose information')
+    parser.add_argument('-o', '--output', metavar='FILE', type=str, default=None,
+                        help='Output file to write the results (default: stdout)')
     parser.add_argument('-s', '--scenario', help='Scenario to run',
                         choices=[s.name for s in Scenario],
                         default=Scenario.NORMAL.name)
@@ -427,7 +428,10 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, sigint_handler)
     i = 0
+    data = []
     while not exit_req:
+        if args.max_iterations > 0 and i >= args.max_iterations:
+            break
         match args.scenario:
             case Scenario.NORMAL.name:
                 for wq in list_for_each_entry('struct workqueue_struct', workqueues.address_of_(), 'list'):
@@ -444,19 +448,27 @@ if __name__ == "__main__":
                     )
                 sys.stdout.flush()
             case Scenario.TOTAL_WORKERS_PER_CPU.name:
-                pp.pprint(scenario_total_workers_per_cpu(i))
+                data.append(scenario_total_workers_per_cpu(i))
             case Scenario.TOTAL_WORKERS_FROM_WQ_PER_CPU.name:
-                pp.pprint(scenario_total_workers_from_workqueue_per_cpu(
+                data.append(scenario_total_workers_from_workqueue_per_cpu(
                     i, filter_name=args.workqueue_names))
             case Scenario.TOTAL_WORK_ITEMS_PER_CPU.name:
-                pp.pprint(scenario_total_work_items_per_cpu(i))
+                data.append(scenario_total_work_items_per_cpu(i))
             case _:
                 err(f'Unknown scenario: {args.scenario}')
-                # pp.pprint(scenario_total_workers_from_workqueue_per_cpu(
-                #     i, filter_name=args.workqueue_names))
-                # pp.pprint(scenario_total_workers_per_cpu(i))
-                # pp.pprint(scenario_total_work_items_per_cpu(i))
+
+        if not args.output:
+            sys.stdout.write(f'Iteration: {i}\n')
+            if args.scenario != Scenario.NORMAL.name:
+                pp.pprint(data[-1])
+
         if args.interval == 0:
             break
         time.sleep(args.interval)
         i += 1
+    if args.output:
+        # output to json file
+        import json
+        with open(args.output, 'w') as f:
+            json.dump(data, f, indent=4)
+    sys.exit(0)

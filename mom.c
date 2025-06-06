@@ -143,35 +143,35 @@ int mom_publish_init(char *addresses_str)
         return ret;
     }
 
-    mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND, 0);
+    mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND | WQ_SYSFS, 0);
     if (unlikely(!mom_first_step))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_UNBOUND, 0);
+    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_UNBOUND | WQ_SYSFS, 0);
     if (unlikely(!mom_second_step_cpu))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_UNBOUND, 0);
+    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_UNBOUND | WQ_SYSFS, 0);
     if (unlikely(!mom_second_step_disk))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND, 0);
+    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND | WQ_SYSFS, 0);
     if (unlikely(!mom_third_step_net_notify_sub))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND, 0);
+    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND | WQ_SYSFS, 0);
     if (unlikely(!mom_third_step_net_ack))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -236,7 +236,7 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
             {
                 .args.cpu_args.args =
                     {
-                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
+                        .matrix_multiplication = {.size = 100, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
         .total_next_workqueue = num_connect_sockets,
@@ -303,7 +303,7 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
             {
                 .args.cpu_args.args =
                     {
-                        .matrix_multiplication = {.size = 10, .a = NULL, .b = NULL, .result = NULL},
+                        .matrix_multiplication = {.size = 100, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
         .total_next_workqueue = 2,

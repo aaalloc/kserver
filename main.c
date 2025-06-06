@@ -40,7 +40,7 @@ static int kserver_port = 12345;
 module_param(kserver_port, int, 0644);
 MODULE_PARM_DESC(kserver_port, "Port number for the kernel server (default: 12345)");
 
-static struct workqueue_struct *kserver_wq_clients_read;
+static struct workqueue_struct *kserver_clients_read;
 
 static struct task_struct *kserver_thread;
 typedef struct _client
@@ -163,7 +163,7 @@ static int kserver_daemon(void *data)
             continue;
         }
 
-        queue_work(kserver_wq_clients_read, client_read_work);
+        queue_work(kserver_clients_read, client_read_work);
     }
 
     pr_info("%s: kserver_daemon stopped\n", THIS_MODULE->name);
@@ -193,8 +193,8 @@ static int __init kserver_init(void)
     // Note for the future: have a check on flags, espcially
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
-    kserver_wq_clients_read = alloc_workqueue("wq_clients_read", WQ_UNBOUND, 0);
-    if (unlikely(!kserver_wq_clients_read))
+    kserver_clients_read = alloc_workqueue("kserver_clients_read", WQ_UNBOUND, 0);
+    if (unlikely(!kserver_clients_read))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
@@ -247,10 +247,10 @@ static void __exit kserver_exit(void)
 
     close_lsocket(listen_sock);
 
-    if (kserver_wq_clients_read)
+    if (kserver_clients_read)
     {
-        flush_workqueue(kserver_wq_clients_read);
-        destroy_workqueue(kserver_wq_clients_read);
+        flush_workqueue(kserver_clients_read);
+        destroy_workqueue(kserver_clients_read);
     }
 
     mom_publish_free();

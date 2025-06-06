@@ -17,6 +17,7 @@ void w_cpu(struct work_struct *work)
     op_cpu_matrix_multiplication_free(&c_task->t.args.cpu_args);
     // pr_info("%s: CPU operation finished\n", THIS_MODULE->name);
 
+    // pr_info("%s: PID of w_cpu: %d\n", THIS_MODULE->name, get_current()->pid);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
         struct next_workqueue *next_wq = &c_task->next_works[i];
@@ -36,6 +37,7 @@ void w_net(struct work_struct *work)
         return;
     }
 
+    // pr_info("%s: PID of w_net: %d\n", THIS_MODULE->name, get_current()->pid);
     // pr_info("%s: network done\n", THIS_MODULE->name);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
@@ -56,6 +58,7 @@ void w_conn_net(struct work_struct *work)
         return;
     }
 
+    // pr_info("%s: PID of w_conn_net: %d\n", THIS_MODULE->name, get_current()->pid);
     // pr_info("%s: network done\n", THIS_MODULE->name);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
@@ -76,6 +79,7 @@ void w_disk(struct work_struct *work)
         return;
     }
 
+    // pr_info("%s: PID of w_disk: %d\n", THIS_MODULE->name, get_current()->pid);
     // pr_info("%s: Disk operation finished, read: %d\n", THIS_MODULE->name, ret);
     for (int i = 0; i < c_task->total_next_workqueue; i++)
     {
