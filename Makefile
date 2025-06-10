@@ -1,7 +1,11 @@
 KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
-ccflags-y += -Wall -g -O3
+# operation.h size buf
+SIZE_BUF_IO := 1024
+
+
+ccflags-y += -Wall -g -O3 -DSIZE_BUF_IO=$(SIZE_BUF_IO)
 
 TARGET = kserver
 

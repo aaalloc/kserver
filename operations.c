@@ -184,7 +184,6 @@ int op_disk_word_counting(op_disk_args_t *args)
     return count;
 }
 
-#define BUFFER_SIZE 4096
 ssize_t op_disk_read(op_disk_args_t *args)
 {
     char *filename = args->filename;
@@ -197,7 +196,7 @@ ssize_t op_disk_read(op_disk_args_t *args)
         return -1;
     }
 
-    unsigned char *buf = kmalloc(BUFFER_SIZE, GFP_KERNEL);
+    unsigned char *buf = kmalloc(BUFFER_SIZE_IO, GFP_KERNEL);
     if (unlikely(!buf))
     {
         pr_err("Failed to allocate memory for buffer\n");
@@ -209,7 +208,7 @@ ssize_t op_disk_read(op_disk_args_t *args)
     ssize_t ret_read;
     while (total_read < len_to_read)
     {
-        ret_read = kernel_read(file, buf, BUFFER_SIZE, &file->f_pos);
+        ret_read = kernel_read(file, buf, BUFFER_SIZE_IO, &file->f_pos);
         if (ret_read < 0)
         {
             pr_err("Failed to read file: %ld\n", ret_read);
@@ -247,7 +246,7 @@ ssize_t op_disk_write(op_disk_args_t *args)
     for (int i = 0; i < iterations; i++)
     {
         ret = kernel_write(file, to_write, len_to_write, &file->f_pos);
-        if (ret < 0)
+        if (unlikely(ret < 0))
         {
             pr_err("Failed to write to file: %zd\n", ret);
             filp_close(file, NULL);

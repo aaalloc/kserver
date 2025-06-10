@@ -1,6 +1,13 @@
 #pragma once
 #include <linux/spinlock.h>
 #include <linux/types.h>
+
+#ifdef SIZE_BUF_IO
+#define BUFFER_SIZE_IO SIZE_BUF_IO
+#else
+#define BUFFER_SIZE_IO 4096
+#endif
+
 typedef struct
 {
     union
