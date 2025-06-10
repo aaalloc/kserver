@@ -284,10 +284,9 @@ int mom_publish_start(struct socket *s, spinlock_t *sp, char *ack_flag_msg, int 
         .t =
             {
                 .args.disk_args = {.filename = "/tmp/mom_disk_write.txt",
-                                   // TODO: for write, I think random value is better
                                    .args.write = {.to_write = "hello_world_something",
                                                   .len_to_write = 22,
-                                                  .iterations = 10000}},
+                                                  .iterations = 1}},
             },
         .total_next_workqueue = 1,
         .next_works = {{
