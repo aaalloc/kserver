@@ -4,16 +4,22 @@ PWD := $(shell pwd)
 # operation.h size buf
 SIZE_BUF_IO := 1024
 
-
+# Include paths for the src structure
 ccflags-y += -Wall -g -O3 -DSIZE_BUF_IO=$(SIZE_BUF_IO)
+ccflags-y += -I$(PWD)/src/lib -I$(PWD)/src/scenario
 
 TARGET = kserver
 
-kserver-y := main.o
-kserver-y += ksocket_handler.o
-kserver-y += operations.o
-kserver-y += task.o
-kserver-y += mom.o
+# Main source file
+kserver-y := src/main.o
+
+# Library files
+kserver-y += src/lib/ksocket_handler.o
+kserver-y += src/lib/operations.o
+kserver-y += src/lib/task.o
+
+# Scenario files
+kserver-y += src/scenario/mom.o
 
 obj-m := kserver.o
 
