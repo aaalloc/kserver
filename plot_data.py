@@ -42,7 +42,7 @@ def normalize_workqueue_iat_data(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(normalized_data)
 
 
-def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path):
+def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path, wq_names_filter: list[str] = None) -> None:
     """
     Plot the number of workqueue workers per CPU using pandas.
         {
@@ -61,6 +61,9 @@ def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path):
                 }
             }
         }
+
+    Notes:
+        wq_name_filter: If provided, filter the DataFrame to only include the specified workqueue name.
     """
     wq_df = df
 
@@ -69,6 +72,8 @@ def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path):
 
     # Create plots for each workqueue
     for wq_name in workqueues:
+        if wq_names_filter and wq_name not in wq_names_filter:
+            continue
         wq_data = wq_df[wq_df['workqueue'] == wq_name]
 
         # Plot total workers, idle, and active workers per CPU
@@ -150,12 +155,10 @@ def load_json_data(file_path) -> pd.DataFrame:
 def main():
     parser = argparse.ArgumentParser(
         description='Generate plots from workqueue monitoring data')
-    parser.add_argument('--total-workers',
-                        help='JSON file with total_workers_per_cpu data')
     parser.add_argument('--workqueue-workers',
                         help='JSON file with total_workers_from_wq_per_cpu data')
-    parser.add_argument(
-        '--work-items', help='JSON file with total_work_items_per_cpu data')
+    parser.add_argument('--wq-names-filter', nargs='*', default=None,
+                        help='Filter workqueue names to plot (space-separated list)')
     parser.add_argument('--output-dir', default='.',
                         help='Output directory for plots')
 
@@ -169,7 +172,7 @@ def main():
     print("Processing workqueue workers per CPU data...")
     data = load_json_data(args.workqueue_workers)
     data = normalize_workqueue_iat_data(data)
-    plot_workqueue_workers_per_cpu(data, output_dir)
+    plot_workqueue_workers_per_cpu(data, output_dir, args.wq_names_filter)
 
     print("Plot generation complete!")
 
