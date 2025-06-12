@@ -372,4 +372,5 @@ void mom_publish_free(void)
     // }
 
     mom_publish_free_wq();
+    free_client_work_list();
 }

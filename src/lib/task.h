@@ -48,7 +48,7 @@ struct client_work
 
 extern spinlock_t lclients_works_lock;
 extern struct list_head lclients_works;
-// void free_client_work_list(void);
+void free_client_work_list(void);
 
 void w_cpu(struct work_struct *work);
 void w_net(struct work_struct *work);

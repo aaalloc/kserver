@@ -88,3 +88,16 @@ void w_disk(struct work_struct *work)
         queue_work(next_wq->wq, &next_wq->cw->work);
     }
 }
+
+void free_client_work_list(void)
+{
+    struct client_work *cw, *tmp;
+    int counter = 0;
+    list_for_each_entry_safe(cw, tmp, &lclients_works, list)
+    {
+        list_del(&cw->list);
+        kfree(cw);
+        counter++;
+    }
+    pr_info("%s: Freed %d client works\n", THIS_MODULE->name, counter);
+}
