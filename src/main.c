@@ -18,8 +18,9 @@
 #include <linux/version.h>
 
 #include "ksocket_handler.h"
-#include "mom.h"
+
 #include "operations.h"
+#include "scenario.h"
 #include "task.h"
 
 MODULE_DESCRIPTION("My kernel module");
@@ -39,6 +40,10 @@ MODULE_PARM_DESC(listen_addresses,
 static int kserver_port = 12345;
 module_param(kserver_port, int, 0644);
 MODULE_PARM_DESC(kserver_port, "Port number for the kernel server (default: 12345)");
+
+static int scenario = -1;
+module_param(scenario, int, 0644);
+MODULE_PARM_DESC(scenario, "Scenario to run (0: CPU, 1: MOM)");
 
 static struct workqueue_struct *kserver_clients_read;
 
@@ -106,7 +111,26 @@ static void client_handler(struct work_struct *work)
             goto clean;
         }
 
-        mom_publish_start(cl->sock, &sp, MOM_PUBLISH_ACK_FLAG, MOM_PUBLISH_ACK_FLAG_LEN);
+        int res = 0;
+        switch (scenario)
+        {
+        case ONLY_CPU:
+            res = only_cpu_start();
+            break;
+        case MOM_PUBLISH:
+            res = mom_publish_start(cl->sock, &sp, MOM_PUBLISH_ACK_FLAG, MOM_PUBLISH_ACK_FLAG_LEN);
+            break;
+        default:
+            pr_err("%s: Invalid scenario selected\n", THIS_MODULE->name);
+            goto clean;
+        }
+
+        if (unlikely(res < 0))
+        {
+            pr_err("%s: Failed to start scenario: %d\n", THIS_MODULE->name, res);
+            goto clean;
+        }
+
         // pr_info("%s: Packet : %s\n", THIS_MODULE->name, buf);
     }
 
@@ -173,9 +197,26 @@ static int kserver_daemon(void *data)
 static int __init kserver_init(void)
 {
     pr_info(KERN_INFO "Server started.\n");
-
     int res = 0;
-    res = mom_publish_init(listen_addresses);
+    if (!is_scenario_valid(scenario))
+    {
+        pr_err("%s: Invalid scenario selected: %d\n", THIS_MODULE->name, scenario);
+        return -EINVAL;
+    }
+
+    pr_info("%s: Running scenario: %s\n", THIS_MODULE->name, get_scenario_description(scenario));
+    switch (scenario)
+    {
+    case ONLY_CPU:
+        res = only_cpu_init();
+        break;
+    case MOM_PUBLISH:
+        res = mom_publish_init(listen_addresses);
+        break;
+    default:
+        pr_err("%s: Invalid scenario selected\n", THIS_MODULE->name);
+        return -EINVAL;
+    }
 
     if (unlikely(res < 0))
     {

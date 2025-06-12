@@ -20,6 +20,7 @@ kserver-y += src/lib/task.o
 
 # Scenario files
 kserver-y += src/scenario/mom.o
+kserver-y += src/scenario/only_cpu.o
 
 obj-m := kserver.o
 
