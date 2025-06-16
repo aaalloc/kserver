@@ -8,7 +8,7 @@ struct workqueue_struct *only_cpu_wq;
 
 int only_cpu_init(void)
 {
-    only_cpu_wq = alloc_workqueue("only_cpu_wq", WQ_UNBOUND | WQ_SYSFS, 0);
+    only_cpu_wq = alloc_workqueue("only_cpu_wq", 0, 0);
     if (unlikely(!only_cpu_wq))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
@@ -26,19 +26,30 @@ int only_cpu_start(void)
         return -EINVAL;
     }
 
-    struct client_work cw = {
+    struct client_work *cw = kzalloc(sizeof(struct client_work), GFP_KERNEL);
+    if (unlikely(!cw))
+    {
+        pr_err("%s: Failed to allocate memory for client_work\n", THIS_MODULE->name);
+        return -ENOMEM;
+    }
+
+    *cw = (struct client_work){
         .t =
             {
                 .args.cpu_args.args =
                     {
-                        .matrix_multiplication = {.size = 100, .a = NULL, .b = NULL, .result = NULL},
+                        .matrix_multiplication = {.size = 1000, .a = NULL, .b = NULL, .result = NULL},
                     },
             },
         .total_next_workqueue = 0,
     };
+    INIT_WORK(&cw->work, w_cpu);
 
-    INIT_WORK(&cw.work, w_cpu);
-    queue_work(only_cpu_wq, &cw.work);
+    spin_lock(&lclients_works_lock);
+    list_add(&cw->list, &lclients_works);
+    spin_unlock(&lclients_works_lock);
+
+    queue_work(only_cpu_wq, &cw->work);
     return 0;
 }
 
@@ -49,4 +60,6 @@ void only_cpu_free(void)
         flush_workqueue(only_cpu_wq);
         destroy_workqueue(only_cpu_wq);
     }
+
+    free_client_work_list();
 }

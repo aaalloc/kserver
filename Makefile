@@ -6,7 +6,7 @@ SIZE_BUF_IO := 1024
 
 # Include paths for the src structure
 ccflags-y += -Wall -g -O3 -DSIZE_BUF_IO=$(SIZE_BUF_IO)
-ccflags-y += -I$(PWD)/src/lib -I$(PWD)/src/scenario
+ccflags-y += -I$(PWD)/src
 
 TARGET = kserver
 
@@ -14,13 +14,13 @@ TARGET = kserver
 kserver-y := src/main.o
 
 # Library files
-kserver-y += src/lib/ksocket_handler.o
-kserver-y += src/lib/operations.o
-kserver-y += src/lib/task.o
+kserver-y += src/ksocket_handler.o
+kserver-y += src/operations.o
+kserver-y += src/task.o
 
 # Scenario files
-kserver-y += src/scenario/mom.o
-kserver-y += src/scenario/only_cpu.o
+kserver-y += src/mom.o
+kserver-y += src/only_cpu.o
 
 obj-m := kserver.o
 

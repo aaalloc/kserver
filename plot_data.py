@@ -42,6 +42,31 @@ def normalize_workqueue_iat_data(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(normalized_data)
 
 
+def plot_metrics(pivot_df: pd.DataFrame, ax, title: str, ylabel: str, chart_type: str = 'line'):
+    """
+    Plot a single metric on the provided axis.
+
+    Parameters:
+    - pivot_df: DataFrame with pivoted data (index=iteration, columns=cpu or wq)
+    - ax: matplotlib Axes object
+    - title: Title for the subplot
+    - ylabel: Y-axis label
+    - chart_type: 'line' or 'stacked'
+    """
+    if chart_type == 'line':
+        pivot_df.plot(ax=ax)
+    elif chart_type == 'stacked':
+        ax.stackplot(pivot_df.index, pivot_df.T.values,
+                     labels=pivot_df.columns)
+        ax.legend()
+    else:
+        raise ValueError("chart_type must be 'line' or 'stacked'")
+
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.grid(True)
+
+
 def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path, wq_names_filter: list[str] = None) -> None:
     """
     Plot the number of workqueue workers per CPU using pandas.
@@ -66,80 +91,44 @@ def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path, wq_names_
         wq_name_filter: If provided, filter the DataFrame to only include the specified workqueue name.
     """
     wq_df = df
-
-    # Get unique workqueues
     workqueues = wq_df['workqueue'].unique()
+    chart_type = 'stacked'  # Default chart type
 
-    # Create plots for each workqueue
+    metrics = ['total_workers', 'idle', 'active']
+    titles = ['Total Workers', 'Idle Workers', 'Active Workers']
     for wq_name in workqueues:
         if wq_names_filter and wq_name not in wq_names_filter:
             continue
+
         wq_data = wq_df[wq_df['workqueue'] == wq_name]
 
-        # Plot total workers, idle, and active workers per CPU
         fig, axes = plt.subplots(3, 1, figsize=(15, 12))
 
-        # Plot total workers
-        wq_data.pivot(index='iteration', columns='cpu_id',
-                      values='total_workers').plot(ax=axes[0])
-        axes[0].set_title(f'{wq_name} - Total Workers per CPU')
-        axes[0].set_ylabel('Total Workers')
-        axes[0].grid(True)
-
-        # Plot idle workers
-        wq_data.pivot(index='iteration', columns='cpu_id',
-                      values='idle').plot(ax=axes[1])
-        axes[1].set_title(f'{wq_name} - Idle Workers per CPU')
-        axes[1].set_ylabel('Idle Workers')
-        axes[1].grid(True)
-
-        # Plot active workers
-        wq_data.pivot(index='iteration', columns='cpu_id',
-                      values='active').plot(ax=axes[2])
-        axes[2].set_title(f'{wq_name} - Active Workers per CPU')
-        axes[2].set_ylabel('Active Workers')
-        axes[2].grid(True)
+        for i, (metric, title) in enumerate(zip(metrics, titles)):
+            pivot_df = wq_data.pivot(
+                index='iteration', columns='cpu_id', values=metric)
+            plot_metrics(
+                pivot_df, axes[i], f'{wq_name} - {title} per CPU', title, chart_type)
 
         plt.tight_layout()
-
-        # Save plot
         safe_wq_name = wq_name.replace(
             '/', '_').replace(' ', '_').replace(':', '_')
         output_file = output_dir / f'workqueue_{safe_wq_name}_per_cpu.png'
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
 
-    # Create aggregated view of all workqueues
+    # Aggregated view
     fig, axes = plt.subplots(3, 1, figsize=(15, 12))
-
-    # Aggregate data per workqueue across all CPUs
     aggregated_data = wq_df.groupby(
         ['iteration', 'workqueue']).sum().reset_index()
 
-    # Plot total workers
-    aggregated_data.pivot(index='iteration', columns='workqueue',
-                          values='total_workers').plot(ax=axes[0])
-    axes[0].set_title('Total Workers per Workqueue (All CPUs)')
-    axes[0].set_ylabel('Total Workers')
-    axes[0].grid(True)
-
-    # Plot idle workers
-    aggregated_data.pivot(index='iteration', columns='workqueue',
-                          values='idle').plot(ax=axes[1])
-    axes[1].set_title('Idle Workers per Workqueue (All CPUs)')
-    axes[1].set_ylabel('Idle Workers')
-    axes[1].grid(True)
-
-    # Plot active workers
-    aggregated_data.pivot(index='iteration', columns='workqueue',
-                          values='active').plot(ax=axes[2])
-    axes[2].set_title('Active Workers per Workqueue (All CPUs)')
-    axes[2].set_ylabel('Active Workers')
-    axes[2].grid(True)
+    for i, (metric, title) in enumerate(zip(metrics, titles)):
+        pivot_df = aggregated_data.pivot(
+            index='iteration', columns='workqueue', values=metric)
+        plot_metrics(
+            pivot_df, axes[i], f'{title} per Workqueue (All CPUs)', title, chart_type)
 
     plt.tight_layout()
-
-    # Save aggregated plot
     output_file = output_dir / 'workqueue_aggregated_summary.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()

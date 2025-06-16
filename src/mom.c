@@ -143,35 +143,35 @@ int mom_publish_init(char *addresses_str)
         return ret;
     }
 
-    mom_first_step = alloc_workqueue("mom_first_step", WQ_UNBOUND | WQ_SYSFS, 0);
+    mom_first_step = alloc_workqueue("mom_first_step", 0, 0);
     if (unlikely(!mom_first_step))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", WQ_UNBOUND | WQ_SYSFS, 0);
+    mom_second_step_cpu = alloc_workqueue("mom_second_step_cpu", 0, 0);
     if (unlikely(!mom_second_step_cpu))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", WQ_UNBOUND | WQ_SYSFS, 0);
+    mom_second_step_disk = alloc_workqueue("mom_second_step_disk", 0, 0);
     if (unlikely(!mom_second_step_disk))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", WQ_UNBOUND | WQ_SYSFS, 0);
+    mom_third_step_net_notify_sub = alloc_workqueue("mom_third_step_net_notify_sub", 0, 0);
     if (unlikely(!mom_third_step_net_notify_sub))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
         return -ENOMEM;
     }
 
-    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", WQ_UNBOUND | WQ_SYSFS, 0);
+    mom_third_step_net_ack = alloc_workqueue("mom_third_step_net_ack", 0, 0);
     if (unlikely(!mom_third_step_net_ack))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);

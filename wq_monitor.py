@@ -38,11 +38,24 @@ wq_unbound_cpumask = prog['wq_unbound_cpumask']
 cpumask_str_len = len(cpumask_str(wq_unbound_cpumask))
 workqueues = prog['workqueues']
 
+# depending on kernel version, prog['POOL_BH'] might cause an error
+try:
+    POOL_BH = prog['POOL_BH']
+except KeyError:
+    # for older kernels, POOL_BH is not defined
+    POOL_BH = 0
 
-POOL_BH = prog['POOL_BH']
+
 WQ_NAME_LEN = prog['WQ_NAME_LEN'].value_()
 WQ_UNBOUND = prog['WQ_UNBOUND']
-WQ_BH = prog['WQ_BH']
+
+
+try:
+    WQ_BH = prog['WQ_BH']
+except KeyError:
+    # for older kernels, WQ_BH is not defined
+    WQ_BH = 0
+
 WQ_ORDERED = prog['__WQ_ORDERED']
 # work items started execution
 PWQ_STAT_STARTED = prog['PWQ_STAT_STARTED']
@@ -388,7 +401,7 @@ def scenario_total_work_items_per_cpu(iteration: int, filter_cpu: list[int] = No
             cpu[worker_pool.cpu.value_()] = {
                 'started': stats[PWQ_STAT_STARTED],
                 'completed': stats[PWQ_STAT_COMPLETED],
-                'current': stats[PWQ_STAT_STARTED] - stats[PWQ_STAT_COMPLETED]
+                'current': pwq.nr_active.value_() if pwq.nr_active else 0
             }
     return cpu
 

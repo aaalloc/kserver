@@ -2,9 +2,9 @@
 
 
 # export WQ_EXP="mom_first_step mom_second_step_cpu mom_second_step_disk mom_third_step_net_notify_sub mom_third_step_net_ack kserver_clients_read"
-export WQ_EXP="only_cpu_tasks"
-export ITERATION=80
-export POLLING_INTERVAL=0.5
+export WQ_EXP_FILTER="only_cpu_wq"
+export ITERATION=300
+export POLLING_INTERVAL=1
 
 declare -a scenarios=(
     # "TOTAL_WORKERS_PER_CPU"
@@ -27,14 +27,13 @@ fi
 
 
 for scenario in "${scenarios[@]}"; do
-    scenario_lower=$(echo "$scenario" | tr '[:upper:]' '[:lower:]')
-    # create variable of file name adding scenario name and timestamp
-    scenario_name="wq_exp_${scenario_lower}_$(date +%Y%m%d_%H%M%S)"
+    tmp_filename=$(echo "$scenario" | tr '[:upper:]' '[:lower:]')
+    filename="wq_exp_${scenario_lower}_$(date +%Y%m%d_%H%M%S)"
     
-    drgn wq_monitor.py $WQ_EXP --scenario=$scenario -i $POLLING_INTERVAL -m $ITERATION -o "${scenario_name}.json" &
+    drgn wq_monitor.py $WQ_EXP --scenario=$scenario -i $POLLING_INTERVAL -m $ITERATION -o "${filename}.json" &
     echo "Running scenario: $scenario"
     echo "Output will be saved to ${scenario_lower}.json"
-    output_paths+=("$scenario_name.json")
+    output_paths+=("${filename}.json")
     pids+=($!)
 done
 
@@ -50,7 +49,7 @@ done
 # generate graph
 for output_path in "${output_paths[@]}"; do
     if [ -f "$output_path" ]; then
-        python3 plot_data.py --workqueue-workers "$output_path" --wq-names-filter $WQ_EXP
+        python3 plot_data.py --workqueue-workers "$output_path" --wq-names-filter $WQ_EXP_FILTER
     else
         echo "Output file $output_path not found."
     fi

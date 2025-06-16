@@ -234,7 +234,7 @@ static int __init kserver_init(void)
     // Note for the future: have a check on flags, espcially
     // WQ_HIGHPRI, WQ_CPU_INTENSIVE
     // https://www.kernel.org/doc/html/next/core-api/workqueue.html#flags
-    kserver_clients_read = alloc_workqueue("kserver_clients_read", WQ_UNBOUND, 0);
+    kserver_clients_read = alloc_workqueue("kserver_clients_read", 0, 0);
     if (unlikely(!kserver_clients_read))
     {
         pr_err("%s: Failed to create workqueue\n", THIS_MODULE->name);
