@@ -24,13 +24,17 @@ kserver-y += src/only_cpu.o
 
 obj-m := kserver.o
 
-wq_insert_exec-y := src/wq_insert_exec.o
-obj-m += wq_insert_exec.o
-
 all: default
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+
+kserver-only:
+	$(MAKE) -C $(KDIR) M=$(PWD) kserver.ko
+
+wq-only:
+	$(MAKE) -C $(KDIR) M=$(PWD) wq_insert_exec.ko
 
 bear:
 	bear --output $(PWD)/.vscode/compile_commands.json -- $(MAKE) -C $(KDIR) M=$(PWD) modules
