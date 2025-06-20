@@ -79,6 +79,8 @@ void write_measurements_to_file(struct file *file, unsigned long long *arr, int 
 
 struct work_struct works[ITERATION];
 
+char path_start[512] = {0};
+char path_end[512] = {0};
 static int __init start(void)
 {
     char *bound_str = unbound_or_bounded ? "unbound" : "bounded";
@@ -99,10 +101,7 @@ static int __init start(void)
              tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 
-    char path_start[512] = {0};
     snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, ITERATION, bound_str, affinity_str, iso_timestamp);
-
-    char path_end[512] = {0};
     snprintf(path_end, sizeof(path_end), PATH_MEASUREMENT_END, ITERATION, bound_str, affinity_str, iso_timestamp);
 
     measurement_start_file = filp_open(path_start, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -165,7 +164,7 @@ static void __exit end(void) {
     }
 
     pr_info("%s: Measurement done, available at\n%s\n %s\n", THIS_MODULE->name,
-                PATH_MEASUREMENT_START, PATH_MEASUREMENT_END);
+                path_start, path_end);
 }
 
 module_init(start);
