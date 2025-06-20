@@ -81,36 +81,6 @@ struct work_struct works[ITERATION];
 
 static int __init start(void)
 {
-    init_hook_measurement_workqueue_insert_exec(update_measurement_start, update_measurement_end);    
-    init_measurement_workqueue_id(work_handler);
-
-    struct workqueue_struct *wq = alloc_workqueue(
-        "wq_time_insert_exec", (unbound_or_bounded ? WQ_UNBOUND : 0) | (high_affinity ? WQ_HIGHPRI : 0), 0);
-
-    if (unlikely(!wq))
-    {
-        pr_err("Failed to create workqueue\n");
-        return -ENOMEM;
-    }
-    pr_info("%s: Workqueue created with %s affinity and %s bound\n", THIS_MODULE->name, high_affinity ? "high" : "low",
-            unbound_or_bounded ? "unbound" : "bounded");
-
-    pr_info("%s: Starting work insertion with %d iterations\n", THIS_MODULE->name, ITERATION);
-    for (int i = 0; i < ITERATION; i++)
-    {
-        INIT_WORK(&works[i], work_handler);
-        queue_work(wq, &works[i]);
-    }
-
-    pr_info("%s: %d works queued\n", THIS_MODULE->name, ITERATION);
-    return 0;
-}
-
-static void __exit end(void) { 
-    pr_info("%s: Exiting module\n", THIS_MODULE->name); 
-    init_hook_measurement_workqueue_insert_exec(NULL, NULL);
-    init_measurement_workqueue_id(NULL);
-
     char *bound_str = unbound_or_bounded ? "unbound" : "bounded";
     char *affinity_str =  high_affinity ? "high" : "low";
 
@@ -150,6 +120,38 @@ static void __exit end(void) {
         return;
     }
 
+
+
+    init_hook_measurement_workqueue_insert_exec(update_measurement_start, update_measurement_end);    
+    init_measurement_workqueue_id(work_handler);
+
+    struct workqueue_struct *wq = alloc_workqueue(
+        "wq_time_insert_exec", (unbound_or_bounded ? WQ_UNBOUND : 0) | (high_affinity ? WQ_HIGHPRI : 0), 0);
+
+    if (unlikely(!wq))
+    {
+        pr_err("Failed to create workqueue\n");
+        return -ENOMEM;
+    }
+    pr_info("%s: Workqueue created with %s affinity and %s bound\n", THIS_MODULE->name, high_affinity ? "high" : "low",
+            unbound_or_bounded ? "unbound" : "bounded");
+
+    pr_info("%s: Starting work insertion with %d iterations\n", THIS_MODULE->name, ITERATION);
+    for (int i = 0; i < ITERATION; i++)
+    {
+        INIT_WORK(&works[i], work_handler);
+        queue_work(wq, &works[i]);
+    }
+
+    pr_info("%s: %d works queued\n", THIS_MODULE->name, ITERATION);
+    return 0;
+}
+
+static void __exit end(void) { 
+    pr_info("%s: Exiting module\n", THIS_MODULE->name); 
+    init_hook_measurement_workqueue_insert_exec(NULL, NULL);
+    init_measurement_workqueue_id(NULL);
+
     write_measurements_to_file(measurement_start_file, measurement_start_arr, index_measurement_start);
     write_measurements_to_file(measurement_end_file, measurement_end_arr, index_measurement_end);
 
@@ -162,7 +164,8 @@ static void __exit end(void) {
         measurement_end_file = NULL;
     }
 
-    pr_info("%s: Measurement files closed\n", THIS_MODULE->name);
+    pr_info("%s: Measurement done, available at\n%s\n %s\n", THIS_MODULE->name,
+                PATH_MEASUREMENT_START, PATH_MEASUREMENT_END);
 }
 
 module_init(start);
