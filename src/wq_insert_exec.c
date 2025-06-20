@@ -33,11 +33,14 @@ static int unbound_or_bounded = 0;
 module_param(unbound_or_bounded, int, 0644);
 MODULE_PARM_DESC(unbound_or_bounded, "0 for unbound workqueue, 1 for bounded workqueue");
 
-#define STRINGIFY(x) #x
-#define TOKENPASTE(x, y) STRINGIFY(x ## y)
 
-#define _PATH_MEASUREMENT_START(x) "/tmp/measurement_start_" TOKENPASTE(x, ".txt")
-#define _PATH_MEASUREMENT_END(x) "/tmp/measurement_end_" TOKENPASTE(x, ".txt")
+#define _PATH_MEASUREMENT_START(x) "/tmp/wq-insert-exec-" x ".txt"
+#define _PATH_MEASUREMENT_END(x) "/tmp/wq-insert-exec-" x ".txt"
+
+
+#ifndef __TIMESTAMP_ISO__
+#define __TIMESTAMP_ISO__ "default-timestamp"
+#endif
 
 #define PATH_MEASUREMENT_START _PATH_MEASUREMENT_START(__TIMESTAMP_ISO__)
 #define PATH_MEASUREMENT_END _PATH_MEASUREMENT_END(__TIMESTAMP_ISO__)
@@ -146,7 +149,6 @@ static void __exit end(void) {
     }
 
     pr_info("%s: Measurement files closed\n", THIS_MODULE->name);
-
 }
 
 module_init(start);
