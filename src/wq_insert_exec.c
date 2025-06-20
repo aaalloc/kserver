@@ -34,16 +34,8 @@ module_param(unbound_or_bounded, int, 0644);
 MODULE_PARM_DESC(unbound_or_bounded, "0 for unbound workqueue, 1 for bounded workqueue");
 
 
-#define _PATH_MEASUREMENT_START(x) "/tmp/wq-insert-exec-" x ".txt"
-#define _PATH_MEASUREMENT_END(x) "/tmp/wq-insert-exec-" x ".txt"
-
-
-#ifndef __TIMESTAMP_ISO__
-#define __TIMESTAMP_ISO__ "default-timestamp"
-#endif
-
-#define PATH_MEASUREMENT_START _PATH_MEASUREMENT_START(__TIMESTAMP_ISO__)
-#define PATH_MEASUREMENT_END _PATH_MEASUREMENT_END(__TIMESTAMP_ISO__)
+#define PATH_MEASUREMENT_START "/tmp/wq-insert-exec-%d-%s-%s_affinity-%s.start"
+#define PATH_MEASUREMENT_END "/tmp/wq-insert-exec-%d-%s-%s_affinity-%s.end"
 
 struct file *measurement_start_file = NULL;
 struct file *measurement_end_file = NULL;
@@ -89,23 +81,6 @@ struct work_struct works[ITERATION];
 
 static int __init start(void)
 {
-    measurement_start_file = filp_open(PATH_MEASUREMENT_START, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (unlikely(IS_ERR(measurement_start_file)))
-    {
-        pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_start_file));
-        return -1;
-    }
-    pr_info("Measurement start file opened: %s\n", PATH_MEASUREMENT_START);
-
-    measurement_end_file = filp_open(PATH_MEASUREMENT_END, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (unlikely(IS_ERR(measurement_end_file)))
-    {
-        pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_end_file));
-        filp_close(measurement_start_file, NULL);
-        return -1;
-    }
-    pr_info("Measurement end file opened: %s\n", PATH_MEASUREMENT_END);
-
     init_hook_measurement_workqueue_insert_exec(update_measurement_start, update_measurement_end);    
     init_measurement_workqueue_id(work_handler);
 
@@ -135,6 +110,45 @@ static void __exit end(void) {
     pr_info("%s: Exiting module\n", THIS_MODULE->name); 
     init_hook_measurement_workqueue_insert_exec(NULL, NULL);
     init_measurement_workqueue_id(NULL);
+
+    char *bound_str = unbound_or_bounded ? "unbound" : "bounded";
+    char *affinity_str =  high_affinity ? "high" : "low";
+
+    struct timespec64 ts;
+    struct tm tm;
+    char iso_timestamp[32];
+
+    // Get current time in UTC
+    ktime_get_real_ts64(&ts);
+    time64_to_tm(ts.tv_sec, 0, &tm);
+
+    // Format: YYYY-MM-DDTHH:MM:SSZ
+    snprintf(iso_timestamp, sizeof(iso_timestamp),
+             "%04ld-%02d-%02dT%02d:%02d:%02dZ",
+             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+             tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+
+    char path_start[512] = {0};
+    snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, ITERATION, bound_str, affinity_str, iso_timestamp);
+
+    char path_end[512] = {0};
+    snprintf(path_end, sizeof(path_end), PATH_MEASUREMENT_END, ITERATION, bound_str, affinity_str, iso_timestamp);
+
+    measurement_start_file = filp_open(path_start, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (unlikely(IS_ERR(measurement_start_file)))
+    {
+        pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_start_file));
+        return -1;
+    }
+
+    measurement_end_file = filp_open(path_end, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (unlikely(IS_ERR(measurement_end_file)))
+    {
+        pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_end_file));
+        filp_close(measurement_start_file, NULL);
+        return -1;
+    }
 
     write_measurements_to_file(measurement_start_file, measurement_start_arr, index_measurement_start);
     write_measurements_to_file(measurement_end_file, measurement_end_arr, index_measurement_end);
