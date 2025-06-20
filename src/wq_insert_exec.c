@@ -33,8 +33,14 @@ static int unbound_or_bounded = 0;
 module_param(unbound_or_bounded, int, 0644);
 MODULE_PARM_DESC(unbound_or_bounded, "0 for unbound workqueue, 1 for bounded workqueue");
 
-#define PATH_MEASUREMENT_START "/tmp/wq_insert_exec_start.txt"
-#define PATH_MEASUREMENT_END "/tmp/wq_insert_exec_end.txt"
+#define STRINGIFY(x) #x
+#define TOKENPASTE(x, y) STRINGIFY(x ## y)
+
+#define _PATH_MEASUREMENT_START(x) "/tmp/measurement_start_" TOKENPASTE(x, ".txt")
+#define _PATH_MEASUREMENT_END(x) "/tmp/measurement_end_" TOKENPASTE(x, ".txt")
+
+#define PATH_MEASUREMENT_START _PATH_MEASUREMENT_START(__TIMESTAMP_ISO__)
+#define PATH_MEASUREMENT_END _PATH_MEASUREMENT_END(__TIMESTAMP_ISO__)
 
 struct file *measurement_start_file = NULL;
 struct file *measurement_end_file = NULL;
@@ -86,6 +92,7 @@ static int __init start(void)
         pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_start_file));
         return -1;
     }
+    pr_info("Measurement start file opened: %s\n", PATH_MEASUREMENT_START);
 
     measurement_end_file = filp_open(PATH_MEASUREMENT_END, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (unlikely(IS_ERR(measurement_end_file)))
@@ -94,6 +101,7 @@ static int __init start(void)
         filp_close(measurement_start_file, NULL);
         return -1;
     }
+    pr_info("Measurement end file opened: %s\n", PATH_MEASUREMENT_END);
 
     init_hook_measurement_workqueue_insert_exec(update_measurement_start, update_measurement_end);    
     init_measurement_workqueue_id(work_handler);
