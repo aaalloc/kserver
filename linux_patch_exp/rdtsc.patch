@@ -1,0 +1,25 @@
+diff --git a/arch/x86/include/asm/msr.h b/arch/x86/include/asm/msr.h
+index 9397a319d..c6858339a 100644
+--- a/arch/x86/include/asm/msr.h
++++ b/arch/x86/include/asm/msr.h
+@@ -224,6 +224,20 @@ static __always_inline unsigned long long rdtsc_ordered(void)
+ 	return EAX_EDX_VAL(val, low, high);
+ }
+ 
++static __always_inline unsigned long long rdtsc_serialize(void)
++{
++	DECLARE_ARGS(val, low, high);
++
++	asm volatile(ALTERNATIVE_2("mfence; rdtsc; lfence",
++				   "mfence; lfence; rdtsc; lfence", X86_FEATURE_LFENCE_RDTSC,
++				   "mfence; rdtscp; lfence", X86_FEATURE_RDTSCP)
++			: EAX_EDX_RET(val, low, high)
++			:: "ecx",   /* RDTSCP clobbers ECX with MSR_TSC_AUX. */
++			   "memory" /* Compiler barrier. */);
++
++	return EAX_EDX_VAL(val, low, high);
++}
++
+ static inline unsigned long long native_read_pmc(int counter)
+ {
+ 	DECLARE_ARGS(val, low, high);

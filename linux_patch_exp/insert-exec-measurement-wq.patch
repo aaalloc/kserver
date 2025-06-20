@@ -1,0 +1,89 @@
+diff --git a/include/linux/workqueue.h b/include/linux/workqueue.h
+index b0dc957c3..860604182 100644
+--- a/include/linux/workqueue.h
++++ b/include/linux/workqueue.h
+@@ -16,6 +16,18 @@
+ #include <linux/rcupdate.h>
+ #include <linux/workqueue_types.h>
+ 
++/*
++ * Used to hook function from a kernel moduel to make measurements
++ */
++extern void init_hook_measurement_workqueue_insert_exec(void (*start)(unsigned long long),
++					    void (*end)(unsigned long long));
++
++/*
++ * Used to have a sort of ID to detect
++ */
++extern void init_measurement_workqueue_id(work_func_t work);
++
++
+ /*
+  * The first word is the work queue pointer and the flags rolled into
+  * one
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index cf6203282..3e3c8361f 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -58,6 +58,36 @@
+ 
+ #include "workqueue_internal.h"
+ 
++void (*hook_measurement_workqueue_start_insert_exec)(unsigned long long) = NULL;
++void (*hook_measurement_workqueue_end_insert_exec)(unsigned long long) = NULL;
++
++work_func_t measurement_workqueue_id = NULL;
++
++
++void init_hook_measurement_workqueue_insert_exec(void (*start)(unsigned long long),
++					    void (*end)(unsigned long long))
++{
++	hook_measurement_workqueue_start_insert_exec = start;
++	hook_measurement_workqueue_end_insert_exec = end;
++}
++EXPORT_SYMBOL(init_hook_measurement_workqueue_insert_exec);
++
++void init_measurement_workqueue_id(work_func_t work)
++{
++	measurement_workqueue_id = work;
++}
++EXPORT_SYMBOL(init_measurement_workqueue_id);
++
++static inline bool is_measurement_workqueue_id(struct work_struct *work)
++{
++	/*
++	 * This is used to detect if the workqueue is being used for
++	 * measurement purposes.
++	 */
++	return (void*)(work->func) == measurement_workqueue_id;
++}
++
++
+ enum worker_pool_flags {
+ 	/*
+ 	 * worker_pool flags
+@@ -2321,6 +2351,12 @@ static void __queue_work(int cpu, struct workqueue_struct *wq,
+ 
+ 	/* pwq determined, queue */
+ 	trace_workqueue_queue_work(req_cpu, pwq, work);
++	if(is_measurement_workqueue_id(work))
++	{
++		if(hook_measurement_workqueue_start_insert_exec)
++			hook_measurement_workqueue_start_insert_exec(rdtsc_serialize());
++	}
++
+ 
+ 	if (WARN_ON(!list_empty(&work->entry)))
+ 		goto out;
+@@ -3235,6 +3271,11 @@ __acquires(&pool->lock)
+ 	 */
+ 	lockdep_invariant_state(true);
+ 	trace_workqueue_execute_start(work);
++	if(is_measurement_workqueue_id(work))
++	{
++		if(hook_measurement_workqueue_end_insert_exec)
++			hook_measurement_workqueue_end_insert_exec(rdtsc_serialize());
++	}
+ 	worker->current_func(work);
+ 	/*
+ 	 * While we must be careful to not use "work" after this, the trace
