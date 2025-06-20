@@ -139,7 +139,7 @@ static void __exit end(void) {
     if (unlikely(IS_ERR(measurement_start_file)))
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_start_file));
-        return -1;
+        return;
     }
 
     measurement_end_file = filp_open(path_end, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -147,7 +147,7 @@ static void __exit end(void) {
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_end_file));
         filp_close(measurement_start_file, NULL);
-        return -1;
+        return;
     }
 
     write_measurements_to_file(measurement_start_file, measurement_start_arr, index_measurement_start);
