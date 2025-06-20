@@ -24,6 +24,9 @@ kserver-y += src/only_cpu.o
 
 obj-m := kserver.o
 
+wq_insert_exec-y := src/wq_insert_exec.o
+obj-m += wq_insert_exec.o
+
 all: default
 
 default:
