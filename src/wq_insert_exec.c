@@ -109,7 +109,7 @@ static int __init start(void)
     if (unlikely(IS_ERR(measurement_start_file)))
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_start_file));
-        return;
+        return -1;
     }
 
     measurement_end_file = filp_open(path_end, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -117,7 +117,7 @@ static int __init start(void)
     {
         pr_err("Failed to open file: %ld\n", PTR_ERR(measurement_end_file));
         filp_close(measurement_start_file, NULL);
-        return;
+        return -1;
     }
 
 
