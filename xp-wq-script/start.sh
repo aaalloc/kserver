@@ -38,11 +38,10 @@ main() {
     for high_affinity in "${high_affinity_values[@]}"; do
         for unbound_or_bounded in "${unbound_or_bounded_values[@]}"; do
             for iteration in "${iterations[@]}"; do
-                
                 sudo insmod  "${MODULE_PATH}" \
                     high_affinity="${high_affinity}" \
                     unbound_or_bounded="${unbound_or_bounded}" \
-                    iterations="${iteration}" || {
+                    iteration="${iteration}" || {
                     echo "Erreur lors de l'insertion du module avec les paramètres: high_affinity=${high_affinity}, unbound_or_bounded=${unbound_or_bounded}, iterations=${iteration}"
                     continue
                 }
