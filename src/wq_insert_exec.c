@@ -25,7 +25,7 @@ MODULE_PARM_DESC(high_affinity, "0 for low affinity, 1 for high affinity");
 
 static int unbound_or_bounded = 0;
 module_param(unbound_or_bounded, int, 0644);
-MODULE_PARM_DESC(unbound_or_bounded, "0 for unbound workqueue, 1 for bounded workqueue");
+MODULE_PARM_DESC(unbound_or_bounded, "0 for bounded workqueue, 1 for unbound workqueue");
 
 static int iteration = 1000;
 module_param(iteration, int, 0644);
