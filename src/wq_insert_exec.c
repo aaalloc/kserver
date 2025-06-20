@@ -43,8 +43,8 @@ struct file *measurement_end_file = NULL;
 unsigned long long *measurement_start_arr = NULL;
 unsigned long long *measurement_end_arr = NULL;
 
-int index_measurement_start = 0;
-int index_measurement_end = 0;
+atomic_t index_measurement_start = ATOMIC_INIT(0);
+atomic_t index_measurement_end = ATOMIC_INIT(0);
 
 struct work_struct *works = NULL;
 
@@ -57,13 +57,19 @@ void work_handler(struct work_struct *work)
 void update_measurement_start(unsigned long long start_time)
 {
     if (measurement_start_file)
-        measurement_start_arr[index_measurement_start++] = start_time;
+    {
+        int tmp_index = atomic_inc_return_relaxed(&index_measurement_start) - 1;
+        measurement_start_arr[tmp_index] = start_time;
+    }
 }
 
 void update_measurement_end(unsigned long long end_time)
 {
     if (measurement_end_file)
-        measurement_end_arr[index_measurement_end++] = end_time;
+    {
+        int tmp_index = atomic_inc_return_relaxed(&index_measurement_end) - 1;
+        measurement_end_arr[tmp_index] = end_time;
+    }
 }
 
 void write_measurements_to_file(struct file *file, unsigned long long *arr, int count)
@@ -161,7 +167,6 @@ static int __init start(void)
         queue_work(wq, &works[i]);
     }
 
-    pr_info("%s: %d works queued\n", THIS_MODULE->name, iteration);
     return 0;
 }
 
@@ -171,8 +176,8 @@ static void __exit end(void)
     init_hook_measurement_workqueue_insert_exec(NULL, NULL);
     init_measurement_workqueue_id(NULL);
 
-    write_measurements_to_file(measurement_start_file, measurement_start_arr, index_measurement_start);
-    write_measurements_to_file(measurement_end_file, measurement_end_arr, index_measurement_end);
+    write_measurements_to_file(measurement_start_file, measurement_start_arr, atomic_read(&index_measurement_start));
+    write_measurements_to_file(measurement_end_file, measurement_end_arr, atomic_read(&index_measurement_end));
 
     if (measurement_start_file)
     {
