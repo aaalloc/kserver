@@ -46,11 +46,21 @@ unsigned long long *measurement_end_arr = NULL;
 atomic_t index_measurement_start = ATOMIC_INIT(0);
 atomic_t index_measurement_end = ATOMIC_INIT(0);
 
-struct work_struct *works = NULL;
+struct work_id
+{
+    int i;
+    struct work_struct work;
+};
+
+struct work_id *works = NULL;
 
 void work_handler(struct work_struct *work)
 {
-    struct task_struct *task = current;
+    struct work_id *id = container_of(work, struct work_id, work);
+    measurement_end_arr[id->i] = rdtsc_serialize(); // Record end time using RDTSC
+    atomic_inc(&index_measurement_end);
+
+    // struct task_struct *task = current;
     // pr_info("Work handler executed by task: %s (PID: %d)\n", task->comm, task->pid);
 }
 
@@ -60,15 +70,6 @@ void update_measurement_start(unsigned long long start_time)
     {
         int tmp_index = atomic_inc_return_relaxed(&index_measurement_start) - 1;
         measurement_start_arr[tmp_index] = start_time;
-    }
-}
-
-void update_measurement_end(unsigned long long end_time)
-{
-    if (measurement_end_file)
-    {
-        int tmp_index = atomic_inc_return_relaxed(&index_measurement_end) - 1;
-        measurement_end_arr[tmp_index] = end_time;
     }
 }
 
@@ -89,7 +90,7 @@ char path_start[512] = {0};
 char path_end[512] = {0};
 static int __init start(void)
 {
-    works = kmalloc_array(iteration, sizeof(struct work_struct), GFP_KERNEL);
+    works = kmalloc_array(iteration, sizeof(struct work_id), GFP_KERNEL);
     if (unlikely(!works))
     {
         pr_err("Failed to allocate memory for works\n");
@@ -146,7 +147,7 @@ static int __init start(void)
         return -1;
     }
 
-    init_hook_measurement_workqueue_insert_exec(update_measurement_start, update_measurement_end);
+    init_hook_measurement_workqueue_insert_exec(update_measurement_start, NULL);
     init_measurement_workqueue_id(work_handler);
 
     struct workqueue_struct *wq = alloc_workqueue(
@@ -163,10 +164,12 @@ static int __init start(void)
     pr_info("%s: Starting work insertion with %d iterations\n", THIS_MODULE->name, iteration);
     for (int i = 0; i < iteration; i++)
     {
-        INIT_WORK(&works[i], work_handler);
-        queue_work(wq, &works[i]);
+        works[i].i = i;
+        INIT_WORK(&works[i].work, work_handler);
+        queue_work(wq, &works[i].work);
     }
 
+    destroy_workqueue(wq);
     return 0;
 }
 
