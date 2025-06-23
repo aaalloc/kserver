@@ -185,6 +185,57 @@ class WQCycleAnalyzer:
         print(f"Summary report saved to {report_path}")
 
 
+def ploottt(df: pd.DataFrame):
+    import math
+    # Get all unique (workqueue_type, affinity) combinations
+    groups = list(df.groupby(['workqueue_type', 'affinity']).groups.keys())
+
+    # Determine subplot grid size (e.g., 2 columns)
+    n = len(groups)
+    cols = 2
+    rows = math.ceil(n / cols)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(
+        cols * 6, rows * 4), squeeze=False)
+
+    # Plot each group in its subplot
+    for idx, ((wq_type, affinity), group_df) in enumerate(df.groupby(['workqueue_type', 'affinity'])):
+        r, c = divmod(idx, cols)
+        ax = axes[r][c]
+
+        # Compute aggregated stats
+        agg_df = group_df.groupby('iteration')['cycle_diff'].agg(
+            ['min', 'median', 'max']).reset_index()
+
+        # Plot on the subplot axis
+        ax.plot(agg_df['iteration'], agg_df['min'],
+                label='Min', linestyle='dotted', marker='o')
+        ax.plot(agg_df['iteration'], agg_df['median'],
+                label='Median', linestyle='solid', marker='o')
+        ax.plot(agg_df['iteration'], agg_df['max'],
+                label='Max', linestyle='dashed', marker='o')
+
+        print(f'{wq_type} | {affinity}')
+        print(agg_df)
+        print('' + '-' * 40)
+
+        ax.set_title(f'{wq_type} | {affinity}')
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Cycle Diff')
+        ax.grid(True)
+        ax.legend()
+
+    # Hide unused subplots (if any)
+    for i in range(n, rows * cols):
+        r, c = divmod(i, cols)
+        fig.delaxes(axes[r][c])
+
+    fig.suptitle(
+        'Cycle Diff per Iteration (per Workqueue Type & Affinity)', fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.97])  # leave space for the suptitle
+    plt.show()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Analyze workqueue cycle measurements (start/end differences)')
@@ -220,6 +271,8 @@ def main():
 
     print("Generating summary report...")
     analyzer.generate_summary_report(diff_df, output_dir)
+
+    ploottt(diff_df)
 
     print(f"Analysis complete! Results saved to {output_dir}")
 
