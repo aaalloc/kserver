@@ -7,6 +7,7 @@ set -e  # Exit on any error
 
 MODULE_PATH="$1"
 MODULE_NAME=$(basename "${MODULE_PATH}" .ko)
+TOTAL_ITERATIONS=100
 
 
 # Vérifier que le module existe
@@ -15,6 +16,17 @@ if [[ ! -f "${MODULE_PATH}" ]]; then
     echo "Usage: $0 [chemin_vers_module.ko]"
     exit 1
 fi
+
+# vérifier si le nombre d'itérations est passé en argument
+if [[ -n "$2" ]]; then
+    if [[ "$2" =~ ^[0-9]+$ ]]; then
+        TOTAL_ITERATIONS="$2"
+    else
+        echo "Erreur: Le nombre d'itérations doit être un entier positif."
+        exit 1
+    fi
+fi
+
 
 # Fonction principale
 main() {
@@ -34,26 +46,28 @@ main() {
     high_affinity_values=(0 1)
     unbound_or_bounded_values=(0 1)
     
-    # Boucles pour toutes les combinaisons
-    for high_affinity in "${high_affinity_values[@]}"; do
-        for unbound_or_bounded in "${unbound_or_bounded_values[@]}"; do
-            for iteration in "${iterations[@]}"; do
-                sudo insmod  "${MODULE_PATH}" \
-                    high_affinity="${high_affinity}" \
-                    unbound_or_bounded="${unbound_or_bounded}" \
-                    iteration="${iteration}" || {
-                    echo "Erreur lors de l'insertion du module avec les paramètres: high_affinity=${high_affinity}, unbound_or_bounded=${unbound_or_bounded}, iterations=${iteration}"
-                    continue
-                }
-                sleep 2
-                sudo rmmod "${MODULE_NAME}" || {
-                    echo "Erreur lors de la suppression du module ${MODULE_NAME}"
-                    continue
-                }
+    for ((i = 0; i < TOTAL_ITERATIONS; i++)); do
+        echo "Exécution de l'itération $((i + 1)) sur $TOTAL_ITERATIONS..."
+        for high_affinity in "${high_affinity_values[@]}"; do
+            for unbound_or_bounded in "${unbound_or_bounded_values[@]}"; do
+                for iteration in "${iterations[@]}"; do
+                    sudo insmod  "${MODULE_PATH}" \
+                        high_affinity="${high_affinity}" \
+                        unbound_or_bounded="${unbound_or_bounded}" \
+                        iteration="${iteration}" || {
+                        echo "Erreur lors de l'insertion du module avec les paramètres: high_affinity=${high_affinity}, unbound_or_bounded=${unbound_or_bounded}, iterations=${iteration}"
+                        continue
+                    }
+                    sleep 2
+                    sudo rmmod "${MODULE_NAME}" || {
+                        echo "Erreur lors de la suppression du module ${MODULE_NAME}"
+                        continue
+                    }
+                done
             done
         done
     done
-    
+
     echo "Tous les tests ont été effectués avec succès."
     echo "============================================"
 }
