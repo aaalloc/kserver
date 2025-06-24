@@ -414,6 +414,7 @@ class Scenario(Enum):
     TOTAL_WORKERS_PER_CPU = scenario_total_workers_per_cpu, 1
     TOTAL_WORKERS_FROM_WQ_PER_CPU = scenario_total_workers_from_workqueue_per_cpu, 2
     TOTAL_WORK_ITEMS_PER_CPU = scenario_total_work_items_per_cpu, 3
+    ALL_POOLWORKQUEUES = 4
 
 
 if __name__ == "__main__":
@@ -467,13 +468,21 @@ if __name__ == "__main__":
                     i, filter_name=args.workqueue_names))
             case Scenario.TOTAL_WORK_ITEMS_PER_CPU.name:
                 data.append(scenario_total_work_items_per_cpu(i))
+            case Scenario.ALL_POOLWORKQUEUES.name:
+                for pi, pool in idr_for_each(worker_pool_idr):
+                    pool = drgn.Object(
+                        prog, 'struct worker_pool', address=pool)
+                    wk = WorkerPool(
+                        pool)
+                    print(wk)
             case _:
                 err(f'Unknown scenario: {args.scenario}')
 
         if not args.output:
             sys.stdout.write(f'Iteration: {i}\n')
             if args.scenario != Scenario.NORMAL.name:
-                pp.pprint(data[-1])
+                if data:
+                    pp.pprint(data[-1])
 
         if args.interval == 0:
             break
