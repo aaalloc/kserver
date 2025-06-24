@@ -135,10 +135,11 @@ class WorkerPool():
     cpus: str
     bh: bool
     unbound: bool
+    show_active: bool
     nr_running: int = -1
     filter_name: str = None
 
-    def __init__(self, _pool, name: str = None):
+    def __init__(self, _pool, name: str = None, show_active: bool = False):
         self._pool = _pool
         self.id = _pool.id.value_()
         self.flags = _pool.flags.value_()
@@ -151,6 +152,7 @@ class WorkerPool():
         self.bh = _pool.flags & POOL_BH
         self.unbound = _pool.cpu < 0
         self.nr_running = _pool.nr_running
+        self.show_active = show_active
 
         # if we want to have info only related to a specific workqueue
         self.filter_name = name
@@ -164,6 +166,9 @@ class WorkerPool():
         return s
 
     def __str__(self):
+        # there is no active workers
+        if self.show_active and self.nr_workers - self.nr_idle == 0:
+            return ""
         s = f'pool[{self.id:0{max_pool_id_len}}] flags=0x{self.flags:02x} ref={self.refcnt:{max_ref_len}} nice={self.nice:3} '
         s += f'idle/workers={self.nr_idle:3}/{self.nr_workers:3} '
         s += f'nr_running={self.nr_running}    '
@@ -431,6 +436,8 @@ if __name__ == "__main__":
                         help='Print verbose information')
     parser.add_argument('-o', '--output', metavar='FILE', type=str, default=None,
                         help='Output file to write the results (default: stdout)')
+    parser.add_argument('-a', '--show-active-pool', action='store_true', default=False,
+                        help='Show active worker pools, only works with --scenario=all_poolworkqueues')
     parser.add_argument('-s', '--scenario', help='Scenario to run',
                         choices=[s.name for s in Scenario],
                         default=Scenario.NORMAL.name)
@@ -473,8 +480,9 @@ if __name__ == "__main__":
                     pool = drgn.Object(
                         prog, 'struct worker_pool', address=pool)
                     wk = WorkerPool(
-                        pool)
-                    print(wk)
+                        pool, show_active=args.show_active_pool)
+                    # print without \n
+                    print(wk, end='', flush=True)
             case _:
                 err(f'Unknown scenario: {args.scenario}')
 
