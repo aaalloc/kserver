@@ -11,4 +11,4 @@ stresstest
 *.jpeg
 *.png
 *.json
-
+__pycache__/
