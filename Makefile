@@ -25,6 +25,8 @@ kserver-y += src/only_cpu.o
 wq_insert_exec-y := src/wq_insert_exec.o
 
 wq_exec_time_pred-y := src/wq_exec_time_pred.o
+wq_exec_time_pred-y += src/eat_time.o
+
 matrix_time_measurement-y := src/matrix_time_measurement.o
 
 obj-m := kserver.o wq_exec_time_pred.o matrix_time_measurement.o
