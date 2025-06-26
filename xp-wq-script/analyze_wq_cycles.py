@@ -141,7 +141,9 @@ class WQCycleAnalyzer:
                     'measurement_idx': idx,
                     'start_cycle': start_cycle,
                     'end_cycle': end_cycle,
-                    'cycle_diff': cycle_diff
+                    'cycle_diff': cycle_diff,
+                    'idx': idx,
+                    'normalized_cycle_diff': cycle_diff / (idx + 1)
                 })
 
         return pd.DataFrame(results)
@@ -221,7 +223,7 @@ def ploottt(df: pd.DataFrame):
 
         ax.set_title(f'{wq_type} | {affinity}')
         ax.set_xlabel('Iteration')
-        ax.set_ylabel('Cycle Diff')
+        ax.set_ylabel('Time taken (in cycles)')
         ax.grid(True)
         ax.legend()
 
@@ -231,8 +233,52 @@ def ploottt(df: pd.DataFrame):
         fig.delaxes(axes[r][c])
 
     fig.suptitle(
-        'Cycle Diff per Iteration (per Workqueue Type & Affinity)', fontsize=16)
+        'Time taken (in cycles) per Iteration (per Workqueue Type & Affinity)', fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.97])  # leave space for the suptitle
+    plt.show()
+
+
+def violin_plot(df: pd.DataFrame):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import math
+
+    # Remove rows with index 0 to avoid division by zero
+    df = df[df.index != 0].copy()
+
+    # Normalize cycle_diff by DataFrame index
+
+    # Get all unique (wq_type, affinity) combinations
+    groups = list(df.groupby(['workqueue_type', 'affinity']).groups.keys())
+
+    # Determine grid size (e.g., 2 columns)
+    n = len(groups)
+    cols = 2
+    rows = math.ceil(n / cols)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(
+        cols * 6, rows * 5), squeeze=False)
+
+    for idx, ((wq_type, affinity), group_df) in enumerate(df.groupby(['workqueue_type', 'affinity'])):
+        r, c = divmod(idx, cols)
+        ax = axes[r][c]
+
+        sns.violinplot(data=group_df, x='iteration',
+                       y='normalized_cycle_diff', ax=ax, inner='quartile')
+
+        ax.set_title(f'{wq_type} | {affinity}')
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Normalized time taken (in cycles)')
+        ax.grid(True, axis='y')
+
+    # Remove unused axes if total plots < rows * cols
+    for i in range(n, rows * cols):
+        r, c = divmod(i, cols)
+        fig.delaxes(axes[r][c])
+
+    fig.suptitle(
+        'Normalized time taken (in cycles) Violin Plot per Iteration (per Workqueue Type & Affinity)', fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 
@@ -264,7 +310,7 @@ def main():
         print("No valid data files found!")
         return
 
-    print("Calculating cycle differences...")
+    print("Calculating time taken...")
     diff_df = analyzer.calculate_cycle_differences(grouped_data)
 
     # .......................................
@@ -273,6 +319,7 @@ def main():
     analyzer.generate_summary_report(diff_df, output_dir)
 
     ploottt(diff_df)
+    violin_plot(diff_df)
 
     print(f"Analysis complete! Results saved to {output_dir}")
 
