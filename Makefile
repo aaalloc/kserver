@@ -22,19 +22,28 @@ kserver-y += src/task.o
 kserver-y += src/mom.o
 kserver-y += src/only_cpu.o
 
-obj-m := kserver.o
+wq_insert_exec-y := src/wq_insert_exec.o
 
+wq_exec_time_pred-y := src/wq_exec_time_pred.o
+matrix_time_measurement-y := src/matrix_time_measurement.o
+
+obj-m := kserver.o wq_exec_time_pred.o matrix_time_measurement.o
 all: default
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
-
 kserver-only:
 	$(MAKE) -C $(KDIR) M=$(PWD) kserver.ko
 
-wq-only:
+wq-insert-exec:
 	$(MAKE) -C $(KDIR) M=$(PWD) wq_insert_exec.ko
+
+wq-exec-time-pred:
+	$(MAKE) -C $(KDIR) M=$(PWD) wq_exec_time_pred.ko
+
+matrix-time-measurement:
+	$(MAKE) -C $(KDIR) M=$(PWD) matrix_time_measurement.ko
 
 bear:
 	bear --output $(PWD)/.vscode/compile_commands.json -- $(MAKE) -C $(KDIR) M=$(PWD) modules
