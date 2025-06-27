@@ -2,12 +2,12 @@
 #include <linux/ktime.h>
 #include <linux/slab.h>
 
-void clock_eat_time(unsigned long nanoseconds)
+void clock_eat_time(int ns)
 {
     // This function will block the execution for a specified number of nanoseconds.
     // It is not intended to do anything useful, just to consume time.
     ktime_t start = ktime_get();
-    ktime_t end = ktime_add_ns(start, nanoseconds);
+    ktime_t end = ktime_add_ns(start, ns);
 
     while (ktime_before(ktime_get(), end))
         ; // Busy-wait until the specified time has passed
