@@ -48,6 +48,7 @@ unsigned long long measurement_end = 0;
 struct work_id
 {
     int time; // Time in seconds
+    void (*func_eattime)(int);
     struct work_struct work;
 };
 
@@ -58,11 +59,16 @@ void work_handler(struct work_struct *work)
 {
     struct work_id *id = container_of(work, struct work_id, work);
 
-    // measurement_start = rdtsc_serialize();
+#ifdef RDTSC_ENABLED
+    measurement_start = rdtsc_serialize();
+#endif
+    id->func_eattime(id->time);
     // NOTE: nanoseconds, milliseconds or seconds?
-    // matrix_eat_time(id->time * 1000);
-    clock_eat_time(id->time);
-    // measurement_end = rdtsc_serialize();
+    // matrix_eat_time(id->time);
+    // clock_eat_time(id->time);
+#ifdef RDTSC_ENABLED
+    measurement_end = rdtsc_serialize();
+#endif
 
     // signal that work is done
     end_work = 1;
@@ -133,6 +139,7 @@ static int __init start(void)
     // convert time seconds to milliseconds
     // for matrix_eat_time, it is in milliseconds
     work_wrap.time = time * 1000; // Convert seconds to milliseconds
+    work_wrap.func_eattime = matrix_eat_time;
     // for clock_eat_time, it is in nanoseconds
     // work_wrap.time = time * 1000000000; // Convert seconds to nanoseconds
     INIT_WORK(&work_wrap.work, work_handler);

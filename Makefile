@@ -8,6 +8,10 @@ SIZE_BUF_IO := 1024
 ccflags-y += -Wall -g -O3 -DSIZE_BUF_IO=$(SIZE_BUF_IO)
 ccflags-y += -I$(PWD)/src
 
+ifeq ($(RDTSC_ENABLED), y)
+ccflags-y += -DRDTSC_ENABLED
+endif
+
 TARGET = kserver
 
 # Main source file

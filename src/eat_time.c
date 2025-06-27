@@ -55,15 +55,17 @@ void free_matrix(int **m, int size)
 }
 
 #define MATRIX_SIZE 1000
-int _a[MATRIX_SIZE][MATRIX_SIZE] = {0};      // Example size, can be adjusted
-int _b[MATRIX_SIZE][MATRIX_SIZE] = {0};      // Example size, can be adjusted
-int _result[MATRIX_SIZE][MATRIX_SIZE] = {0}; // Example size, can be adjusted
+int _a[MATRIX_SIZE * MATRIX_SIZE] = {0};      // Example size, can be adjusted
+int _b[MATRIX_SIZE * MATRIX_SIZE] = {0};      // Example size, can be adjusted
+int _result[MATRIX_SIZE * MATRIX_SIZE] = {0}; // Example size, can be adjusted
 
-void perform_matrix_operations(void)
+noinline void perform_matrix_operations(int *a, int *b, int *result, int size_matrix)
 {
-    for (int i = 0; i < MATRIX_SIZE; i++)
-        for (int j = 0; j < MATRIX_SIZE; j++)
-            _result[i][j] = _a[i][j] + _b[i][j]; // Example operation: matrix addition
+    // This function performs some operations on the matrices.
+    // For demonstration, we will just add two matrices together.
+    for (int i = 0; i < size_matrix; i++)
+        for (int j = 0; j < size_matrix; j++)
+            result[i * size_matrix + j] = a[i * size_matrix + j] + b[i * size_matrix + j];
 }
 
 struct matrix_eat_time_param
@@ -80,9 +82,9 @@ struct matrix_eat_time_param MATRIX_LUT[] = {
     [10] = {.size_matrix = 1000, .repeat_operations = 10},     [5] = {.size_matrix = 1000, .repeat_operations = 5},
     [1] = {.size_matrix = 1000, .repeat_operations = 1}};
 
-void matrix_eat_time(int nanoseconds)
+void matrix_eat_time(int ms)
 {
-    struct matrix_eat_time_param param = MATRIX_LUT[1]; // Default to 1x1 matrix
+    struct matrix_eat_time_param param = MATRIX_LUT[ms]; // Default to 1x1 matrix
     for (int i = 0; i < param.repeat_operations; i++)
-        perform_matrix_operations();
+        perform_matrix_operations(_a, _b, _result, param.size_matrix);
 }
