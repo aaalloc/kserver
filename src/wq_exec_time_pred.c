@@ -61,7 +61,7 @@ void work_handler(struct work_struct *work)
     // measurement_start = rdtsc_serialize();
     // NOTE: nanoseconds, milliseconds or seconds?
     // matrix_eat_time(id->time * 1000);
-    clock_eat_time(id->time * 1000000000); // Convert seconds to nanoseconds
+    clock_eat_time(id->time);
     // measurement_end = rdtsc_serialize();
 
     // signal that work is done
@@ -130,7 +130,11 @@ static int __init start(void)
     pr_info("%s: Workqueue created with %s affinity and %s bound\n", THIS_MODULE->name, high_affinity ? "high" : "low",
             unbound_or_bounded ? "unbound" : "bounded");
 
-    work_wrap.time = time;
+    // convert time seconds to milliseconds
+    // for matrix_eat_time, it is in milliseconds
+    work_wrap.time = time * 1000; // Convert seconds to milliseconds
+    // for clock_eat_time, it is in nanoseconds
+    // work_wrap.time = time * 1000000000; // Convert seconds to nanoseconds
     INIT_WORK(&work_wrap.work, work_handler);
     queue_work(wq, &work_wrap.work);
     wait_event(wait_end, end_work == 1);

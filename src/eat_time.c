@@ -13,7 +13,7 @@ void clock_eat_time(unsigned long nanoseconds)
         ; // Busy-wait until the specified time has passed
     ktime_t elapsed = ktime_sub(ktime_get(), start);
     // Debug purpose: Print the start and end times
-    pr_info("Clock eat time: elapsed = %lld ns", ktime_to_ns(elapsed));
+    // pr_info("Clock eat time: elapsed = %lld ns", ktime_to_ns(elapsed));
 }
 
 int **create_matrix(int size)
@@ -74,9 +74,11 @@ struct matrix_eat_time_param
 
 // NOTE: LUT based on empircal measurements done on grid5000/grenoble with troll nodes
 struct matrix_eat_time_param MATRIX_LUT[] = {
-    [1] = {.size_matrix = 1, .repeat_operations = 1000000}, [2] = {.size_matrix = 2, .repeat_operations = 1000000},
-    //.....
-};
+    // index in milliseconds
+    [1000] = {.size_matrix = 1000, .repeat_operations = 1059}, [500] = {.size_matrix = 1000, .repeat_operations = 525},
+    [100] = {.size_matrix = 1000, .repeat_operations = 105},   [50] = {.size_matrix = 1000, .repeat_operations = 50},
+    [10] = {.size_matrix = 1000, .repeat_operations = 10},     [5] = {.size_matrix = 1000, .repeat_operations = 5},
+    [1] = {.size_matrix = 1000, .repeat_operations = 1}};
 
 void matrix_eat_time(int nanoseconds)
 {
