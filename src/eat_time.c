@@ -68,23 +68,9 @@ noinline void perform_matrix_operations(int *a, int *b, int *result, int size_ma
             result[i * size_matrix + j] = a[i * size_matrix + j] + b[i * size_matrix + j];
 }
 
-struct matrix_eat_time_param
+void matrix_eat_time(struct matrix_eat_time_param param)
 {
-    int size_matrix;
-    int repeat_operations;
-};
-
-// NOTE: LUT based on empircal measurements done on grid5000/grenoble with troll nodes
-struct matrix_eat_time_param MATRIX_LUT[] = {
-    // index in milliseconds
-    [1000] = {.size_matrix = 1000, .repeat_operations = 1059}, [500] = {.size_matrix = 1000, .repeat_operations = 525},
-    [100] = {.size_matrix = 1000, .repeat_operations = 105},   [50] = {.size_matrix = 1000, .repeat_operations = 50},
-    [10] = {.size_matrix = 1000, .repeat_operations = 10},     [5] = {.size_matrix = 1000, .repeat_operations = 5},
-    [1] = {.size_matrix = 1000, .repeat_operations = 1}};
-
-void matrix_eat_time(int ms)
-{
-    struct matrix_eat_time_param param = MATRIX_LUT[ms]; // Default to 1x1 matrix
+    // struct matrix_eat_time_param param = MATRIX_LUT[ms]; // Default to 1x1 matrix
     for (int i = 0; i < param.repeat_operations; i++)
         perform_matrix_operations(_a, _b, _result, param.size_matrix);
 }

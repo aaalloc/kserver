@@ -36,6 +36,10 @@ static int time = 2;
 module_param(time, int, 0644);
 MODULE_PARM_DESC(time, "Number of time to spend in function (in seconds)");
 
+static int work_type = 0;
+module_param(work_type, int, 0644);
+MODULE_PARM_DESC(work_type, "0 for matrix_eat_time, 1 for clock_eat_time");
+
 #define PATH_MEASUREMENT_START "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.start"
 #define PATH_MEASUREMENT_END "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.end"
 
@@ -45,27 +49,28 @@ struct file *measurement_end_file = NULL;
 unsigned long long measurement_start = 0;
 unsigned long long measurement_end = 0;
 
-struct work_id
+int end_work = 0;
+DECLARE_WAIT_QUEUE_HEAD(wait_end);
+struct clock_work
 {
-    int time; // Time in seconds
-    void (*func_eattime)(int);
+    int time;
     struct work_struct work;
 };
 
-int end_work = 0;
-DECLARE_WAIT_QUEUE_HEAD(wait_end);
-
-void work_handler(struct work_struct *work)
+struct matrix_work
 {
-    struct work_id *id = container_of(work, struct work_id, work);
+    struct matrix_eat_time_param param;
+    struct work_struct work;
+};
+
+void clock_work_handler(struct work_struct *work)
+{
+    struct clock_work *id = container_of(work, struct clock_work, work);
 
 #ifdef RDTSC_ENABLED
     measurement_start = rdtsc_serialize();
 #endif
-    id->func_eattime(id->time);
-    // NOTE: nanoseconds, milliseconds or seconds?
-    // matrix_eat_time(id->time);
-    // clock_eat_time(id->time);
+    clock_eat_time(id->time);
 #ifdef RDTSC_ENABLED
     measurement_end = rdtsc_serialize();
 #endif
@@ -73,8 +78,23 @@ void work_handler(struct work_struct *work)
     // signal that work is done
     end_work = 1;
     wake_up(&wait_end);
-    // struct task_struct *task = current;
-    // pr_info("Work handler executed by task: %s (PID: %d)\n", task->comm, task->pid);
+}
+
+void matrix_work_handler(struct work_struct *work)
+{
+    struct matrix_work *id = container_of(work, struct matrix_work, work);
+
+#ifdef RDTSC_ENABLED
+    measurement_start = rdtsc_serialize();
+#endif
+    matrix_eat_time(id->param);
+#ifdef RDTSC_ENABLED
+    measurement_end = rdtsc_serialize();
+#endif
+
+    // signal that work is done
+    end_work = 1;
+    wake_up(&wait_end);
 }
 
 void write_measurements_to_file(struct file *file, unsigned long long val)
@@ -89,7 +109,6 @@ void write_measurements_to_file(struct file *file, unsigned long long val)
 
 char path_start[512] = {0};
 char path_end[512] = {0};
-struct work_id work_wrap = {0};
 static int __init start(void)
 {
     char *bound_str = unbound_or_bounded ? "unbound" : "bounded";
@@ -136,14 +155,27 @@ static int __init start(void)
     pr_info("%s: Workqueue created with %s affinity and %s bound\n", THIS_MODULE->name, high_affinity ? "high" : "low",
             unbound_or_bounded ? "unbound" : "bounded");
 
-    // convert time seconds to milliseconds
-    // for matrix_eat_time, it is in milliseconds
-    work_wrap.time = time * 1000; // Convert seconds to milliseconds
-    work_wrap.func_eattime = matrix_eat_time;
-    // for clock_eat_time, it is in nanoseconds
-    // work_wrap.time = time * 1000000000; // Convert seconds to nanoseconds
-    INIT_WORK(&work_wrap.work, work_handler);
-    queue_work(wq, &work_wrap.work);
+    switch (work_type)
+    {
+    case 0: // matrix_eat_time
+        struct matrix_work work_wrap = {
+            .param = MATRIX_LUT[time * 1000], // time seconds to milliseconds
+        };
+        INIT_WORK(&work_wrap.work, matrix_work_handler);
+        queue_work(wq, &work_wrap.work);
+        break;
+    case 1: // clock_eat_time
+        struct clock_work work_wrap_clock = {
+            .time = time * 1000000000, // Time in seconds to nanoseconds
+        };
+        INIT_WORK(&work_wrap_clock.work, clock_work_handler);
+        queue_work(wq, &work_wrap_clock.work);
+        break;
+    default:
+        pr_err("Invalid work type: %d\n", work_type);
+        destroy_workqueue(wq);
+        return -EINVAL;
+    }
     wait_event(wait_end, end_work == 1);
     pr_info("%s: Work completed\n", THIS_MODULE->name);
     destroy_workqueue(wq);
