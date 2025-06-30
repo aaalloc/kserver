@@ -44,8 +44,8 @@ static int n_op_matrix = 1000;
 module_param(n_op_matrix, int, 0644);
 MODULE_PARM_DESC(n_op_matrix, "Number of operations for matrix_eat_time");
 
-#define PATH_MEASUREMENT_START "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.start"
-#define PATH_MEASUREMENT_END "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.end"
+#define PATH_MEASUREMENT_START "/tmp/wq-exec-time-%d-%s-%s_affinity-%s.start"
+#define PATH_MEASUREMENT_END "/tmp/wq-exec-time-%d-%s-%s_affinity-%s.end"
 
 struct file *measurement_start_file = NULL;
 struct file *measurement_end_file = NULL;
@@ -130,8 +130,9 @@ static int __init start(void)
     snprintf(iso_timestamp, sizeof(iso_timestamp), "%04ld-%02d-%02dT%02d:%02d:%02dZ", tm.tm_year + 1900, tm.tm_mon + 1,
              tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-    snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, time, bound_str, affinity_str, iso_timestamp);
-    snprintf(path_end, sizeof(path_end), PATH_MEASUREMENT_END, time, bound_str, affinity_str, iso_timestamp);
+    snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, n_op_matrix, bound_str, affinity_str,
+             iso_timestamp);
+    snprintf(path_end, sizeof(path_end), PATH_MEASUREMENT_END, n_op_matrix, bound_str, affinity_str, iso_timestamp);
 
     measurement_start_file = filp_open(path_start, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (unlikely(IS_ERR(measurement_start_file)))
