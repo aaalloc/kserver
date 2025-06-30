@@ -121,7 +121,7 @@ main_xp_wq_exec_pred() {
     unbound_or_bounded_values=(0 1)
     n_op_matrix_values=(1000 2000 3000 4000 5000)
     
-    iteration=1000
+    iteration=100
 
     for ((i = 0; i < TOTAL_ITERATIONS; i++)); do
         echo "Exécution de l'itération $((i + 1)) sur $TOTAL_ITERATIONS..."

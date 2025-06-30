@@ -53,8 +53,7 @@ struct file *measurement_end_file = NULL;
 unsigned long long measurement_start = 0;
 unsigned long long measurement_end = 0;
 
-int end_work = 0;
-static DECLARE_WAIT_QUEUE_HEAD(wait_end);
+static DECLARE_COMPLETION(xp_done);
 struct clock_work
 {
     int time;
@@ -79,9 +78,7 @@ void clock_work_handler(struct work_struct *work)
     measurement_end = rdtsc_serialize();
 #endif
 
-    // signal that work is done
-    end_work = 1;
-    wake_up_interruptible(&wait_end);
+    complete(&xp_done);
 }
 
 void matrix_work_handler(struct work_struct *work)
@@ -97,8 +94,7 @@ void matrix_work_handler(struct work_struct *work)
 #endif
 
     // signal that work is done
-    end_work = 1;
-    wake_up_interruptible(&wait_end);
+    complete(&xp_done);
 }
 
 void write_measurements_to_file(struct file *file, unsigned long long val)
@@ -113,7 +109,8 @@ void write_measurements_to_file(struct file *file, unsigned long long val)
 
 char path_start[512] = {0};
 char path_end[512] = {0};
-static int __init start(void)
+
+static int start_xp(void *data)
 {
     char *bound_str = unbound_or_bounded ? "unbound" : "bounded";
     char *affinity_str = high_affinity ? "high" : "low";
@@ -126,9 +123,9 @@ static int __init start(void)
     ktime_get_real_ts64(&ts);
     time64_to_tm(ts.tv_sec, 0, &tm);
 
-    // Format: YYYY-MM-DDTHH:MM:SSZ
-    snprintf(iso_timestamp, sizeof(iso_timestamp), "%04ld-%02d-%02dT%02d:%02d:%02dZ", tm.tm_year + 1900, tm.tm_mon + 1,
-             tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    // Format: YYYY-MM-DDTHH:MM:SS.MSZ
+    snprintf(iso_timestamp, sizeof(iso_timestamp), "%04ld-%02d-%02dT%02d:%02d:%02d.%03luZ", tm.tm_year + 1900,
+             tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec / 1000000);
 
     snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, n_op_matrix, bound_str, affinity_str,
              iso_timestamp);
@@ -181,11 +178,13 @@ static int __init start(void)
         destroy_workqueue(wq);
         return -EINVAL;
     }
-    wait_event_interruptible(wait_end, end_work != 0);
+    wait_for_completion(&xp_done);
     pr_info("%s: Work completed\n", THIS_MODULE->name);
     destroy_workqueue(wq);
     return 0;
 }
+
+static int __init start(void) { return start_xp(NULL); }
 
 static void __exit end(void)
 {
