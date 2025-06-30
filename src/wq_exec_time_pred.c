@@ -54,7 +54,7 @@ unsigned long long measurement_start = 0;
 unsigned long long measurement_end = 0;
 
 int end_work = 0;
-DECLARE_WAIT_QUEUE_HEAD(wait_end);
+static DECLARE_WAIT_QUEUE_HEAD(wait_end);
 struct clock_work
 {
     int time;
@@ -81,7 +81,7 @@ void clock_work_handler(struct work_struct *work)
 
     // signal that work is done
     end_work = 1;
-    wake_up(&wait_end);
+    wake_up_interruptible(&wait_end);
 }
 
 void matrix_work_handler(struct work_struct *work)
@@ -98,7 +98,7 @@ void matrix_work_handler(struct work_struct *work)
 
     // signal that work is done
     end_work = 1;
-    wake_up(&wait_end);
+    wake_up_interruptible(&wait_end);
 }
 
 void write_measurements_to_file(struct file *file, unsigned long long val)
@@ -181,7 +181,7 @@ static int __init start(void)
         destroy_workqueue(wq);
         return -EINVAL;
     }
-    wait_event(wait_end, end_work == 1);
+    wait_event_interruptible(wait_end, end_work != 0);
     pr_info("%s: Work completed\n", THIS_MODULE->name);
     destroy_workqueue(wq);
     return 0;
