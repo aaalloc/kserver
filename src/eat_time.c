@@ -54,7 +54,6 @@ void free_matrix(int **m, int size)
     kfree(m);
 }
 
-#define MATRIX_SIZE 1000
 int _a[MATRIX_SIZE * MATRIX_SIZE] = {0};      // Example size, can be adjusted
 int _b[MATRIX_SIZE * MATRIX_SIZE] = {0};      // Example size, can be adjusted
 int _result[MATRIX_SIZE * MATRIX_SIZE] = {0}; // Example size, can be adjusted
@@ -70,7 +69,6 @@ noinline void perform_matrix_operations(int *a, int *b, int *result, int size_ma
 
 void matrix_eat_time(struct matrix_eat_time_param param)
 {
-    // struct matrix_eat_time_param param = MATRIX_LUT[ms]; // Default to 1x1 matrix
     for (int i = 0; i < param.repeat_operations; i++)
         perform_matrix_operations(_a, _b, _result, param.size_matrix);
 }

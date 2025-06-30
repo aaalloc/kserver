@@ -40,6 +40,10 @@ static int work_type = 0;
 module_param(work_type, int, 0644);
 MODULE_PARM_DESC(work_type, "0 for matrix_eat_time, 1 for clock_eat_time");
 
+static int n_op_matrix = 1000;
+module_param(n_op_matrix, int, 0644);
+MODULE_PARM_DESC(n_op_matrix, "Number of operations for matrix_eat_time");
+
 #define PATH_MEASUREMENT_START "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.start"
 #define PATH_MEASUREMENT_END "/tmp/wq-exec-time-%ds-%s-%s_affinity-%s.end"
 
@@ -157,10 +161,10 @@ static int __init start(void)
 
     switch (work_type)
     {
-    case 0: // matrix_eat_time
-        struct matrix_work work_wrap = {
-            .param = MATRIX_LUT[time * 1000], // time seconds to milliseconds
-        };
+    case 0:                                                                   // matrix_eat_time
+        struct matrix_work work_wrap = {.param = {.size_matrix = MATRIX_SIZE, // Example size, can be adjusted
+                                                  .repeat_operations = n_op_matrix}};
+
         INIT_WORK(&work_wrap.work, matrix_work_handler);
         queue_work(wq, &work_wrap.work);
         break;
