@@ -127,8 +127,8 @@ main_xp_wq_exec_pred() {
         echo "Exécution de l'itération $((i + 1)) sur $TOTAL_ITERATIONS..."
         for high_affinity in "${high_affinity_values[@]}"; do
             for unbound_or_bounded in "${unbound_or_bounded_values[@]}"; do
-                for ((i=0;i<$iteration;i++)); do
-                    for n_op_matrix in "${n_op_matrix_values[@]}"; do
+                for n_op_matrix in "${n_op_matrix_values[@]}"; do
+                    for ((i=0;i<$iteration;i++)); do
                         xp_wq_exec_pred "$high_affinity" "$unbound_or_bounded" "$n_op_matrix"
                         if [[ $? -ne 0 ]]; then
                             echo "Échec de l'exécution avec high_affinity=${high_affinity}, unbound_or_bounded=${unbound_or_bounded}, n_op_matrix=${n_op_matrix}"
