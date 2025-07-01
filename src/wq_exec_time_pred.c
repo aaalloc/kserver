@@ -44,8 +44,8 @@ static int n_op_matrix = 1000;
 module_param(n_op_matrix, int, 0644);
 MODULE_PARM_DESC(n_op_matrix, "Number of operations for matrix_eat_time");
 
-#define PATH_MEASUREMENT_START "/tmp/wq-exec-time-%d-%s-%s_affinity-%s.start"
-#define PATH_MEASUREMENT_END "/tmp/wq-exec-time-%d-%s-%s_affinity-%s.end"
+#define PATH_MEASUREMENT_START "/tmp/wq-exec-time-pred-%d-%s-%s_affinity-%s.start"
+#define PATH_MEASUREMENT_END "/tmp/wq-exec-time-pred-%d-%s-%s_affinity-%s.end"
 
 struct file *measurement_start_file = NULL;
 struct file *measurement_end_file = NULL;
@@ -124,7 +124,7 @@ static int start_xp(void *data)
     time64_to_tm(ts.tv_sec, 0, &tm);
 
     // Format: YYYY-MM-DDTHH:MM:SS.MSZ
-    snprintf(iso_timestamp, sizeof(iso_timestamp), "%04ld-%02d-%02dT%02d:%02d:%02d.%03luZ", tm.tm_year + 1900,
+    snprintf(iso_timestamp, sizeof(iso_timestamp), "%04ld-%02d-%02dT%02d:%02d:%02d:%03luZ", tm.tm_year + 1900,
              tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec / 1000000);
 
     snprintf(path_start, sizeof(path_start), PATH_MEASUREMENT_START, n_op_matrix, bound_str, affinity_str,
