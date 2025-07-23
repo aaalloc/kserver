@@ -36,7 +36,7 @@ wq_new_worker-y += src/eat_time.o
 
 matrix_time_measurement-y := src/matrix_time_measurement.o
 
-obj-m := wq_new_worker.o kserver.o wq_exec_time_pred.o matrix_time_measurement.o 
+obj-m := kserver.o wq_insert_exec.o wq_exec_time_pred.o wq_new_worker.o matrix_time_measurement.o
 all: default
 
 default:

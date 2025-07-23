@@ -33,8 +33,8 @@ module_param(unbound_or_bounded, int, 0644);
 MODULE_PARM_DESC(unbound_or_bounded, "0 for bounded workqueue, 1 for unbound workqueue");
 
 static int nr_work_max = 1000;
-module_param(unbound_or_bounded, int, 0644);
-MODULE_PARM_DESC(unbound_or_bounded, "0 for bounded workqueue, 1 for unbound workqueue");
+module_param(nr_work_max, int, 0644);
+MODULE_PARM_DESC(nr_work_max, "Maximum number of work items");
 
 static int delay = 1000;
 module_param(delay, int, 0644);
