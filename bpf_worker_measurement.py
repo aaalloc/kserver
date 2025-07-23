@@ -53,17 +53,28 @@ def remove_module():
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(
-    #     description="Trace create_worker latency and manage kernel module.")
+    parser = argparse.ArgumentParser(
+        description="Trace create_worker latency and manage kernel module.")
     # parser.add_argument(
     #     "--module-path",
     #     type=lambda p: Path(p) if Path(p).is_file() else parser.error(
     #         f"File '{p}' does not exist."),
     #     required=True,
     #     help="Path to the kernel module to insert"
-    # )
+    parser.add_argument(
+        "--delay",
+        type=int,
+        default=100,
+        help="Delay value to pass to the kernel module (default: 100)"
+    )
+    parser.add_argument(
+        "--nr-work-max",
+        type=int,
+        default=500,
+        help="nr_work_max value to pass to the kernel module (default: 500)"
+    )
 
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
     b: BPF = BPF(text=program)
     b.attach_kprobe(event="create_worker", fn_name="trace_start")
@@ -71,7 +82,7 @@ if __name__ == "__main__":
 
     print("Tracing create_worker... Hit Ctrl-C to end.")
 
-    insert_module()
+    insert_module(delay=args.delay, nr_work_max=args.nr_work_max)
 
     print("\nLatency histogram:")
     b["dist"].print_log2_hist("us")
