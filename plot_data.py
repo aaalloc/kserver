@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Script pour générer des graphiques basés sur les données de workqueue du kernel.
+Script pour générer des graphiques basés sur les données de workqueue du kernel 
+obtenu via wq_monito.py
+
 Utilise matplotlib pour créer des visualisations des trois structures de données.
 """
 
+import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
@@ -92,7 +95,7 @@ def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path, wq_names_
     """
     wq_df = df
     workqueues = wq_df['workqueue'].unique()
-    chart_type = 'stacked'  # Default chart type
+    chart_type = 'line'  # Default chart type
 
     metrics = ['total_workers', 'idle', 'active']
     titles = ['Total Workers', 'Idle Workers', 'Active Workers']
@@ -117,23 +120,35 @@ def plot_workqueue_workers_per_cpu(df: pd.DataFrame, output_dir: Path, wq_names_
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
 
-    # Aggregated view
+    if wq_names_filter:
+        filtered_wq_df = wq_df[~wq_df['workqueue'].isin(wq_names_filter)]
+    else:
+        filtered_wq_df = wq_df.copy()
+
+    # Aggregate remaining workqueues into a single "total"
+    aggregated_data = (
+        filtered_wq_df
+        .groupby(['iteration'])
+        .sum(numeric_only=True)
+        .reset_index()
+    )
+    aggregated_data['workqueue'] = 'total'  # Add a "total" label
+
+    # Prepare for plotting
     fig, axes = plt.subplots(3, 1, figsize=(15, 12))
-    aggregated_data = wq_df.groupby(
-        ['iteration', 'workqueue']).sum().reset_index()
 
     for i, (metric, title) in enumerate(zip(metrics, titles)):
         pivot_df = aggregated_data.pivot(
-            index='iteration', columns='workqueue', values=metric)
+            index='iteration', columns='workqueue', values=metric
+        )
         plot_metrics(
-            pivot_df, axes[i], f'{title} per Workqueue (All CPUs)', title, chart_type)
+            pivot_df, axes[i], f'{title} - Total (Excluding Filtered WQs)', title, chart_type
+        )
 
     plt.tight_layout()
-    output_file = output_dir / 'workqueue_aggregated_summary.png'
+    output_file = output_dir / 'workqueue_aggregated_summary_total_only.png'
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
-
-    print("Workqueue workers per CPU plots generation complete!")
 
 
 def load_json_data(file_path) -> pd.DataFrame:
