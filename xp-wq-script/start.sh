@@ -144,5 +144,20 @@ main_xp_wq_exec_pred() {
     echo "============================================"
 }
 
+main() {
+    case "$MODULE_NAME" in
+        "wq_insert_exec")
+            main_xp_wq_insert_exec
+            ;;
+        "wq_exec_pred")
+            main_xp_wq_exec_pred
+            ;;
+        *)
+            echo "Erreur: MODULE_NAME invalide. Choisissez parmi: ${AVAILABLE_EXP[*]}"
+            exit 1
+            ;;
+    esac
+}
+
 # Exécuter le script principal
 main "$@"

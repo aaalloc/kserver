@@ -13,30 +13,54 @@ class WQXPEnum(Enum):
 
 class WQCycleAnalyzer:
 
-    def __init__(self, data_dir: Path, xp_type: WQXPEnum):
+    def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir)
         self.data_cache = {}
         self.parsed_files = []
-        self.xp_type = xp_type
+        # glob wq-* and first value is type, so if first file is wq-exec-time-pred then xp_type is EXEC_TIME_PRED
+        first_file = next(iter(self.data_dir.glob('wq-*')), None)
+        if first_file:
+            if WQXPEnum.EXEC_TIME_PRED.value in first_file.name:
+                self.xp_type = WQXPEnum.EXEC_TIME_PRED
+            elif WQXPEnum.INSERT_EXEC.value in first_file.name:
+                self.xp_type = WQXPEnum.INSERT_EXEC
+            else:
+                raise ValueError(
+                    f"Unknown workqueue type in file name: {first_file.name}")
+        else:
+            raise ValueError(
+                "No workqueue files found in the specified directory.")
 
     def parse_filename(self, filename: str) -> Optional[Dict[str, str]]:
         """
         Parse filename following convention:
         wq-...-{iteration}-{bounded|unbound}-{low_affinity|high_affinity}-{timestamp}.{start|end}
         """
-        pattern = r'wq-{type}-(\d+)-(bounded|unbound)-(low_affinity|high_affinity)-([^.]+)\.(start|end)'.format(
+        pattern = r"wq-{type}-(\d+)-(bounded|unbound)-(low_affinity|high_affinity)-(.+)\.(start|end)".format(
             type=self.xp_type.value
         )
         match = re.match(pattern, filename)
-
         if match:
-            return {
-                'iteration': int(match.group(1)),
-                'workqueue_type': match.group(2),
-                'affinity': match.group(3),
-                'timestamp': match.group(4),
-                'cycle_type': match.group(5)
-            }
+            match self.xp_type.value:
+                case WQXPEnum.INSERT_EXEC.value:
+                    return {
+                        'iteration': int(match.group(1)),
+                        'workqueue_type': match.group(2),
+                        'affinity': match.group(3),
+                        'timestamp': match.group(4),
+                        'cycle_type': match.group(5)
+                    }
+                case WQXPEnum.EXEC_TIME_PRED.value:
+                    return {
+                        'matrix_op': int(match.group(1)),
+                        'workqueue_type': match.group(2),
+                        'affinity': match.group(3),
+                        'timestamp': match.group(4),
+                        'cycle_type': match.group(5),
+                    }
+                case _:
+                    print(f"Unknown workqueue type: {self.xp_type.value}")
+                    return None
         return None
 
     def load_cycles_data(self, file_path: Path) -> List[int]:
@@ -55,7 +79,8 @@ class WQCycleAnalyzer:
 
     def load_data_files(self) -> Dict[str, Dict[str, List[int]]]:
         """Load all data files and group them by test configuration."""
-        files = list(self.data_dir.glob('wq-insert-exec-*'))
+        # file start with wq and end with .start or .end
+        files = list(self.data_dir.glob('wq-*'))
 
         grouped_data = defaultdict(lambda: {'start': None, 'end': None})
 
@@ -64,10 +89,17 @@ class WQCycleAnalyzer:
             if not parsed:
                 print(f"Skipping file with invalid name: {file_path.name}")
                 continue
-
             # Create a key for grouping (iteration, workqueue_type, affinity, timestamp)
-            key = (parsed['iteration'], parsed['workqueue_type'],
-                   parsed['affinity'], parsed['timestamp'])
+            match self.xp_type.value:
+                case WQXPEnum.INSERT_EXEC.value:
+                    key = (parsed['iteration'], parsed['workqueue_type'],
+                           parsed['affinity'], parsed['timestamp'])
+                case WQXPEnum.EXEC_TIME_PRED.value:
+                    key = (parsed['matrix_op'], parsed['workqueue_type'],
+                           parsed['affinity'], parsed['timestamp'])
+                case _:
+                    print(f"Unknown workqueue type: {self.xp_type.value}")
+                    continue
 
             try:
                 # Load cycles data (one cycle per line)
@@ -92,7 +124,14 @@ class WQCycleAnalyzer:
         results = []
 
         for key, data_pair in grouped_data.items():
-            iteration, workqueue_type, affinity, timestamp = key
+            match self.xp_type.value:
+                case WQXPEnum.INSERT_EXEC.value:
+                    iteration, workqueue_type, affinity, timestamp = key
+                case WQXPEnum.EXEC_TIME_PRED.value:
+                    matrix_op, workqueue_type, affinity, timestamp = key
+                case _:
+                    print(f"Unknown workqueue type: {self.xp_type.value}")
+                    continue
 
             start_cycles = data_pair['start']
             end_cycles = data_pair['end']
@@ -115,17 +154,23 @@ class WQCycleAnalyzer:
                 cycle_diff = end_cycle - start_cycle
 
                 results.append({
-                    'iteration': iteration,
                     'workqueue_type': workqueue_type,
                     'affinity': affinity,
                     'timestamp': timestamp,
                     'measurement_idx': idx,
                     'start_cycle': start_cycle,
                     'end_cycle': end_cycle,
+                    # Convert cycles to seconds, hardcoded value: 2.3 GHz from troll node / grid5000,
+                    'time_taken': cycle_diff / 23e8,
                     'cycle_diff': cycle_diff,
                     'idx': idx,
                     'normalized_cycle_diff': cycle_diff / (idx + 1)
                 })
+                match self.xp_type.value:
+                    case WQXPEnum.INSERT_EXEC.value:
+                        results[-1]['iteration'] = iteration
+                    case WQXPEnum.EXEC_TIME_PRED.value:
+                        results[-1]['matrix_op'] = matrix_op
 
         return pd.DataFrame(results)
 
