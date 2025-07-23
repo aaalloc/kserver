@@ -1,0 +1,82 @@
+diff --git a/include/trace/events/workqueue.h b/include/trace/events/workqueue.h
+index b0de2bc9e..5a0b920b8 100644
+--- a/include/trace/events/workqueue.h
++++ b/include/trace/events/workqueue.h
+@@ -126,6 +126,56 @@ TRACE_EVENT(workqueue_execute_end,
+ 	TP_printk("work struct %p: function %ps", __entry->work, __entry->function)
+ );
+ 
++
++/**
++ * workqueue_worker_dying_start - called when a worker is set to die
++ * @worker:	pointer to struct worker
++ * @pid:	pid of the worker
++ *
++ * This event occurs when a worker is set to die, which happens
++ * in idle_cull_fn function.
++ */
++TRACE_EVENT(workqueue_worker_dying_start,
++	TP_PROTO(struct worker *worker, pid_t pid),
++
++	TP_ARGS(worker, pid),
++
++	TP_STRUCT__entry(
++		__field( void *,	worker	)
++		__field( pid_t,	pid	)
++	),
++
++	TP_fast_assign(
++		__entry->worker	= worker;
++		__entry->pid	= pid;
++	),
++
++	TP_printk("worker %p: pid %d, set to die", __entry->worker, __entry->pid)
++);
++
++/**
++ * workqueue_worker_dying_end - called when a worker just before it dies
++ * @worker:	pointer to struct worker
++ * @pid:	pid of the worker
++ *
++ * This event occurs when a worker is about to die, which happens
++ * in worker_thread function.
++ */
++TRACE_EVENT(workqueue_worker_dying_end,
++	TP_PROTO(struct worker *worker, pid_t pid),
++	TP_ARGS(worker, pid),
++	TP_STRUCT__entry(
++		__field( void *,	worker	)
++		__field( pid_t,	pid	)
++	),
++	TP_fast_assign(
++		__entry->worker	= worker;
++		__entry->pid	= pid;
++	),
++	TP_printk("worker %p: pid %d, about to die", __entry->worker, __entry->pid)
++);
++
++
+ #endif /*  _TRACE_WORKQUEUE_H */
+ 
+ /* This part must be outside protection */
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index c29ff3fac..d3086b3db 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -2976,6 +2976,7 @@ static void idle_cull_fn(struct work_struct *work)
+ 			break;
+ 		}
+ 
++		trace_workqueue_worker_dying_start(worker, worker->task->pid);
+ 		set_worker_dying(worker, &cull_list);
+ 	}
+ 
+@@ -3366,6 +3367,8 @@ woke_up:
+ 		 */
+ 		worker->pool = NULL;
+ 		ida_free(&pool->worker_ida, worker->id);
++
++		trace_workqueue_worker_dying_end(worker, worker->task->pid);
+ 		return 0;
+ 	}
+ 
