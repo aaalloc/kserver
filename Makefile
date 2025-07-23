@@ -31,9 +31,12 @@ wq_insert_exec-y := src/wq_insert_exec.o
 wq_exec_time_pred-y := src/wq_exec_time_pred.o
 wq_exec_time_pred-y += src/eat_time.o
 
+wq_new_worker-y := src/wq_new_worker.o
+wq_new_worker-y += src/eat_time.o
+
 matrix_time_measurement-y := src/matrix_time_measurement.o
 
-obj-m := kserver.o wq_exec_time_pred.o matrix_time_measurement.o
+obj-m := wq_new_worker.o kserver.o wq_exec_time_pred.o matrix_time_measurement.o 
 all: default
 
 default:
@@ -47,6 +50,10 @@ wq-insert-exec:
 
 wq-exec-time-pred:
 	$(MAKE) -C $(KDIR) M=$(PWD) wq_exec_time_pred.ko
+
+
+wq-new-worker:
+	$(MAKE) -C $(KDIR) M=$(PWD) wq_new_worker.ko
 
 matrix-time-measurement:
 	$(MAKE) -C $(KDIR) M=$(PWD) matrix_time_measurement.ko
