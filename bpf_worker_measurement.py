@@ -36,21 +36,22 @@ program_worker_die_measurement = """
 BPF_HASH(start, u32, u64);
 BPF_HISTOGRAM(duration_us);
 
-TRACEPOINT_PROBE(workqueue, workqueue_worker_dying_start) {
+int trace_start(struct tracepoint__workqueue__workqueue_worker_dying_start *args) {
     u32 pid = args->pid;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
 }
 
-TRACEPOINT_PROBE(workqueue, workqueue_worker_dying_end) {
+int trace_end(struct tracepoint__workqueue__workqueue_worker_dying_end *args) {
     u32 pid = args->pid;
     u64 *tsp = start.lookup(&pid);
-    if (!tsp) return 0;
+    if (!tsp)
+        return 0;
 
     u64 delta = bpf_ktime_get_ns() - *tsp;
-    delta /= 1000;  // ns -> us
-    duration_us.increment(bpf_log2l(delta));
+    u64 delta_us = delta / 1000;
+    duration_us.increment(bpf_log2l(delta_us));
     start.delete(&pid);
     return 0;
 }
@@ -155,15 +156,19 @@ if __name__ == "__main__":
         gen_hist_plot(buckets, counts, labels, args.type_measurement, args.save_plot)
         exit(0)
     else:
-        b: BPF = BPF(text=program_worker_creation_measurement if args.type_measurement == "creation" else program_worker_die_measurement)
+        b: BPF
         match args.type_measurement:
             case "creation":
+                b = BPF(text=program_worker_creation_measurement)
                 b.attach_kprobe(event="create_worker", fn_name="trace_start")
                 b.attach_kretprobe(event="create_worker", fn_name="trace_end")
 
                 insert_module(delay=args.delay, nr_work_max=args.nr_work_max)
                 remove_module()
             case 'die':
+                b = BPF(text=program_worker_die_measurement)
+                b.attach_tracepoint(tp="workqueue:workqueue_worker_dying_start", fn_name="trace_start")
+                b.attach_tracepoint(tp="workqueue:workqueue_worker_dying_end", fn_name="trace_end")
                 try:
                     print("Tracing workqueue_worker_dying_start/end... Hit Ctrl-C to end.")
                     b.trace_print()
