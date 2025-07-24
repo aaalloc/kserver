@@ -36,22 +36,24 @@ program_worker_die_measurement = """
 BPF_HASH(start, u32, u64);
 BPF_HISTOGRAM(duration_us);
 
-int trace_start(struct tracepoint__workqueue__workqueue_worker_dying_start *args) {
+TRACEPOINT_PROBE(workqueue, workqueue_worker_dying_start) {
     u32 pid = args->pid;
     u64 ts = bpf_ktime_get_ns();
     start.update(&pid, &ts);
     return 0;
 }
 
-int trace_end(struct tracepoint__workqueue__workqueue_worker_dying_end *args) {
+TRACEPOINT_PROBE(workqueue, workqueue_worker_dying_end) {
     u32 pid = args->pid;
     u64 *tsp = start.lookup(&pid);
-    if (!tsp)
-        return 0;
+    if (tsp == 0) {
+        return 0;   // missed start
+    }
 
     u64 delta = bpf_ktime_get_ns() - *tsp;
     u64 delta_us = delta / 1000;
     duration_us.increment(bpf_log2l(delta_us));
+
     start.delete(&pid);
     return 0;
 }
@@ -156,7 +158,7 @@ if __name__ == "__main__":
         gen_hist_plot(buckets, counts, labels, args.type_measurement, args.save_plot)
         exit(0)
     else:
-        b: BPF
+        b: BPF = None
         match args.type_measurement:
             case "creation":
                 b = BPF(text=program_worker_creation_measurement)
@@ -167,11 +169,9 @@ if __name__ == "__main__":
                 remove_module()
             case 'die':
                 b = BPF(text=program_worker_die_measurement)
-                b.attach_tracepoint(tp="workqueue:workqueue_worker_dying_start", fn_name="trace_start")
-                b.attach_tracepoint(tp="workqueue:workqueue_worker_dying_end", fn_name="trace_end")
                 try:
                     print("Tracing workqueue_worker_dying_start/end... Hit Ctrl-C to end.")
-                    b.trace_print()
+                    b.trace_print(fmt="pid {1}, msg = {5}")
                 except KeyboardInterrupt:
                     print("Tracing stopped by user.")
                 
